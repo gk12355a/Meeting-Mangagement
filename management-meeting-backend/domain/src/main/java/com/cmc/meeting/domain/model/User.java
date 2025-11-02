@@ -2,6 +2,10 @@ package com.cmc.meeting.domain.model;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.util.HashSet;
+import java.util.Set;
+
 import lombok.AllArgsConstructor;
 
 @Data
@@ -12,6 +16,5 @@ public class User {
     private String username; // Thường là email
     private String fullName;
     private String password;
-    // Chúng ta không để password ở đây. 
-    // Domain model không cần biết về password.
+    private Set<Role> roles = new HashSet<>();
 }

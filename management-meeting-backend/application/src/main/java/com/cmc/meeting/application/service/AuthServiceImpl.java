@@ -7,7 +7,7 @@ import com.cmc.meeting.application.port.service.AuthService;
 import com.cmc.meeting.domain.model.User;
 import com.cmc.meeting.domain.port.repository.UserRepository;
 import com.cmc.meeting.application.port.security.TokenProvider;
-
+import com.cmc.meeting.domain.model.Role;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -58,22 +58,19 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public String register(RegisterRequest registerRequest) {
-        // 1. Kiểm tra username (email) đã tồn tại chưa
         if (userRepository.findByUsername(registerRequest.getUsername()).isPresent()) {
             throw new RuntimeException("Lỗi: Username (Email) đã được sử dụng!");
         }
 
-        // 2. Tạo đối tượng User mới từ Domain
         User newUser = new User();
         newUser.setUsername(registerRequest.getUsername());
         newUser.setFullName(registerRequest.getFullName());
-
-        // 3. Băm mật khẩu (QUAN TRỌNG)
         newUser.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
-
-        // 4. Lưu vào CSDL
+        
+        // BỔ SUNG: Gán quyền mặc định
+        newUser.getRoles().add(Role.ROLE_USER);
+        
         userRepository.save(newUser);
-
         return "Đăng ký người dùng thành công!";
     }
 }
