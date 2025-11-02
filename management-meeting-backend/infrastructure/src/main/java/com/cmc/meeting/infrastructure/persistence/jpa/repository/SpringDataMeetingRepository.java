@@ -1,0 +1,29 @@
+package com.cmc.meeting.infrastructure.persistence.jpa.repository;
+
+import com.cmc.meeting.infrastructure.persistence.jpa.entity.MeetingEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity, Long> {
+
+    /**
+     * Hiện thực logic kiểm tra trùng lịch (isRoomBusy)
+     * Đây là query kiểm tra "khoảng thời gian chồng chéo" (Overlap)
+     */
+    @Query("SELECT COUNT(m) > 0 FROM MeetingEntity m " +
+           "WHERE m.room.id = :roomId " +
+           "AND m.status = 'CONFIRMED' " +
+           "AND m.startTime < :endTime " + // Cuộc họp cũ kết thúc SAU khi cuộc họp mới bắt đầu
+           "AND m.endTime > :startTime")   // Cuộc họp cũ bắt đầu TRƯỚC khi cuộc họp mới kết thúc
+    boolean findRoomOverlap(@Param("roomId") Long roomId,
+                            @Param("startTime") LocalDateTime startTime,
+                            @Param("endTime") LocalDateTime endTime);
+    @Query("SELECT DISTINCT m FROM MeetingEntity m " +
+           "LEFT JOIN m.participants p " +
+           "WHERE m.organizer.id = :userId OR p.id = :userId")
+    List<MeetingEntity> findAllByUserId(@Param("userId") Long userId);
+}
