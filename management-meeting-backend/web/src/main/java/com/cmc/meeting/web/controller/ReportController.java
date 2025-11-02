@@ -2,10 +2,14 @@ package com.cmc.meeting.web.controller;
 
 import com.cmc.meeting.application.dto.report.CancelationReportDTO;
 import com.cmc.meeting.application.dto.report.RoomUsageReportDTO;
+import com.cmc.meeting.application.port.service.ExcelExportService;
 import com.cmc.meeting.application.port.service.ReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -14,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.ByteArrayInputStream;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -25,19 +30,42 @@ import java.util.List;
 public class ReportController {
 
     private final ReportService reportService;
+    private final ExcelExportService excelExportService;
 
-    public ReportController(ReportService reportService) {
+    public ReportController(ReportService reportService, 
+                            ExcelExportService excelExportService) {
         this.reportService = reportService;
+        this.excelExportService = excelExportService; // BỔ SUNG
     }
 
     @GetMapping("/room-usage")
-    @Operation(summary = "Báo cáo tần suất sử dụng phòng họp (US-22)")
-    public ResponseEntity<List<RoomUsageReportDTO>> getRoomUsageReport(
+    @Operation(summary = "Báo cáo tần suất sử dụng phòng họp (US-22). Thêm ?format=excel để tải về.")
+    public ResponseEntity<?> getRoomUsageReport(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String format) { // <-- Thêm param "format"
 
+        // 1. Lấy dữ liệu (như cũ)
         List<RoomUsageReportDTO> report = reportService.getRoomUsageReport(from, to);
-        return ResponseEntity.ok(report);
+
+        // 2. Kiểm tra xem có muốn xuất Excel không
+        if ("excel".equalsIgnoreCase(format)) {
+
+            // 3. Gọi Service Excel
+            ByteArrayInputStream excelFile = excelExportService.exportRoomUsageReport(report);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.add("Content-Disposition", "attachment; filename=BaoCaoSuDungPhong.xlsx");
+
+            return ResponseEntity
+                    .ok()
+                    .headers(headers)
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .body(new InputStreamResource(excelFile));
+        } else {
+            // 4. Trả về JSON (như cũ)
+            return ResponseEntity.ok(report);
+        }
     }
     // BỔ SUNG: (US-23)
     @GetMapping("/cancelation-stats")
