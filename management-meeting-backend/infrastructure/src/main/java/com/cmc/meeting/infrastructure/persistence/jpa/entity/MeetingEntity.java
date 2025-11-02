@@ -1,6 +1,8 @@
 package com.cmc.meeting.infrastructure.persistence.jpa.entity;
 
 import com.cmc.meeting.domain.model.BookingStatus;
+import com.cmc.meeting.infrastructure.persistence.jpa.embeddable.EmbeddableParticipant;
+
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -42,11 +44,7 @@ public class MeetingEntity {
     @JoinColumn(name = "organizer_id", nullable = false)
     private UserEntity organizer;
 
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-        name = "meeting_participants",
-        joinColumns = @JoinColumn(name = "meeting_id"),
-        inverseJoinColumns = @JoinColumn(name = "user_id")
-    )
-    private Set<UserEntity> participants;
+    @ElementCollection(fetch = FetchType.EAGER) // Lấy danh sách participant ngay
+    @CollectionTable(name = "meeting_participants", joinColumns = @JoinColumn(name = "meeting_id"))
+    private Set<EmbeddableParticipant> participants;
 }

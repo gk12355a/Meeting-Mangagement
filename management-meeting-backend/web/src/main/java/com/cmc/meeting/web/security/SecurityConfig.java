@@ -1,6 +1,6 @@
 package com.cmc.meeting.web.security;
 
-import com.cmc.meeting.web.security.CustomUserDetailsService;
+// import com.cmc.meeting.web.security.CustomUserDetailsService;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.context.annotation.Bean;
@@ -65,8 +65,11 @@ public class SecurityConfig {
             .authorizeHttpRequests(authorize -> authorize
                 // --- PHÂN QUYỀN ---
                 // Cho phép các API này (Swagger, Auth)
-                .requestMatchers("/api/v1/auth/**").permitAll()
-                .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                .requestMatchers(
+                    "/api/v1/auth/**",
+                    "/api/v1/meetings/respond-by-link", // <-- BỔ SUNG
+                    "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**"
+                ).permitAll()
                 
                 // Tất cả các API còn lại (như /api/v1/meetings)
                 .anyRequest().authenticated() // Đều phải được xác thực

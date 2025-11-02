@@ -1,9 +1,11 @@
 package com.cmc.meeting.web.controller;
 
+import com.cmc.meeting.application.dto.meeting.MeetingResponseRequest;
 import com.cmc.meeting.application.dto.request.MeetingCreationRequest;
 import com.cmc.meeting.application.dto.request.MeetingUpdateRequest;
 import com.cmc.meeting.application.dto.response.MeetingDTO;
 import com.cmc.meeting.application.port.service.MeetingService;
+import com.cmc.meeting.domain.model.ParticipantStatus;
 // BỔ SUNG: Import 2 thư viện này
 import com.cmc.meeting.domain.port.repository.UserRepository;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -125,5 +127,51 @@ public class MeetingController {
         MeetingDTO updatedMeeting = meetingService.updateMeeting(id, request, currentUser.getId());
         
         return ResponseEntity.ok(updatedMeeting); // 200 OK
+    }
+    @PostMapping("/{id}/respond") // Dùng phương thức POST
+    @Operation(summary = "Chấp nhận (ACCEPT) hoặc Từ chối (DECLINE) một lời mời họp")
+    public ResponseEntity<?> respondToInvitation(
+            @PathVariable Long id, // Lấy ID cuộc họp từ URL
+            @Valid @RequestBody MeetingResponseRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        
+        // 1. Lấy ID user từ token
+        com.cmc.meeting.domain.model.User currentUser = userRepository.findByUsername(userDetails.getUsername())
+                .orElseThrow(() -> new RuntimeException("Lỗi: Không tìm thấy user từ token"));
+        
+        // 2. Gọi service
+        meetingService.respondToInvitation(id, request, currentUser.getId());
+        
+        return ResponseEntity.ok("Đã phản hồi lời mời thành công."); // 200 OK
+    }
+    @GetMapping(value = "/respond-by-link", produces = "text/html;charset=UTF-8")
+    @Operation(summary = "Phản hồi lời mời họp qua link email (Không cần đăng nhập)")
+    public ResponseEntity<String> respondByLink(
+            @RequestParam String token,
+            @RequestParam ParticipantStatus status) {
+
+        try {
+            String message = meetingService.respondByLink(token, status);
+
+            // Trả về 1 trang HTML đơn giản
+            String htmlResponse = String.format(
+                "<html><body style='font-family: Arial; text-align: center; margin-top: 50px;'>" +
+                "<h1>%s</h1>" +
+                "<p>Bạn có thể đóng tab này.</p>" +
+                "</body></html>", 
+                message
+            );
+            return ResponseEntity.ok(htmlResponse);
+
+        } catch (Exception e) {
+            String htmlError = String.format(
+                "<html><body style='font-family: Arial; text-align: center; margin-top: 50px;'>" +
+                "<h1>Đã xảy ra lỗi</h1>" +
+                "<p>%s</p>" +
+                "</body></html>", 
+                e.getMessage()
+            );
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(htmlError);
+        }
     }
 }

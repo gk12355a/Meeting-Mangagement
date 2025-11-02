@@ -19,4 +19,5 @@ public interface MeetingRepository {
     boolean isRoomBusy(Long roomId, LocalDateTime startTime, LocalDateTime endTime);
     List<Meeting> findAllByUserId(Long userId);
     List<Meeting> findConfirmedMeetingsInDateRange(LocalDateTime from, LocalDateTime to);
+    Optional<Meeting> findMeetingByParticipantToken(String token);
 }

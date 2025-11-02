@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity, Long> {
 
@@ -24,7 +25,7 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
                             @Param("endTime") LocalDateTime endTime);
     @Query("SELECT DISTINCT m FROM MeetingEntity m " +
            "LEFT JOIN m.participants p " +
-           "WHERE m.organizer.id = :userId OR p.id = :userId")
+           "WHERE m.organizer.id = :userId OR p.userId = :userId") // <-- SỬA p.id THÀNH p.userId
     List<MeetingEntity> findAllByUserId(@Param("userId") Long userId);
     // BỔ SUNG: (US-22)
     // Tìm các cuộc họp đã 'CONFIRMED' nằm trong khoảng thời gian
@@ -34,4 +35,6 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
     List<MeetingEntity> findConfirmedMeetingsInDateRange(
             @Param("from") LocalDateTime from, 
             @Param("to") LocalDateTime to);
+    @Query("SELECT m FROM MeetingEntity m JOIN m.participants p WHERE p.responseToken = :token")
+    Optional<MeetingEntity> findMeetingByParticipantToken(@Param("token") String token);
 }

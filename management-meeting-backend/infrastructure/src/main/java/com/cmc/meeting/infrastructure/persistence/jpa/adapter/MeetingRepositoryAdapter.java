@@ -1,69 +1,130 @@
 package com.cmc.meeting.infrastructure.persistence.jpa.adapter;
 
 import com.cmc.meeting.domain.model.Meeting;
+import com.cmc.meeting.domain.model.MeetingParticipant; // Bổ sung
+import com.cmc.meeting.domain.model.User; // Bổ sung
 import com.cmc.meeting.domain.port.repository.MeetingRepository;
+import com.cmc.meeting.domain.port.repository.UserRepository; // Bổ sung
 import com.cmc.meeting.infrastructure.persistence.jpa.entity.MeetingEntity;
+import com.cmc.meeting.infrastructure.persistence.jpa.embeddable.EmbeddableParticipant; // Bổ sung
 import com.cmc.meeting.infrastructure.persistence.jpa.repository.SpringDataMeetingRepository;
+// Bỏ: @PostConstruct
 import org.modelmapper.ModelMapper;
+// Bỏ: TypeMap
 import org.springframework.stereotype.Repository;
-import java.util.List; // Bổ sung
-import java.util.stream.Collectors; // Bổ sung
-import java.time.LocalDateTime;
-import java.util.Optional;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set; // Bổ sung
+import java.util.stream.Collectors;
 
 @Repository
 public class MeetingRepositoryAdapter implements MeetingRepository {
 
     private final SpringDataMeetingRepository jpaRepository;
     private final ModelMapper modelMapper;
+    private final UserRepository userRepository; // Bổ sung
 
-    public MeetingRepositoryAdapter(SpringDataMeetingRepository jpaRepository, ModelMapper modelMapper) {
+    // CẬP NHẬT CONSTRUCTOR
+    public MeetingRepositoryAdapter(SpringDataMeetingRepository jpaRepository, 
+                                    ModelMapper modelMapper,
+                                    UserRepository userRepository) { // Bổ sung
         this.jpaRepository = jpaRepository;
         this.modelMapper = modelMapper;
+        this.userRepository = userRepository; // Bổ sung
     }
 
+    // BỎ: @PostConstruct
+    
     @Override
     public Meeting save(Meeting meeting) {
-        // Map từ Domain Model -> Entity
-        MeetingEntity entity = modelMapper.map(meeting, MeetingEntity.class);
-
-        // Lưu Entity
+        // Map thủ công Domain -> Entity
+        MeetingEntity entity = toEntity(meeting);
         MeetingEntity savedEntity = jpaRepository.save(entity);
-
-        // Map ngược từ Entity -> Domain Model để trả về
-        return modelMapper.map(savedEntity, Meeting.class);
+        // Map thủ công Entity -> Domain
+        return toDomain(savedEntity);
     }
 
     @Override
     public Optional<Meeting> findById(Long id) {
-        return jpaRepository.findById(id)
-                .map(entity -> modelMapper.map(entity, Meeting.class));
+        // Map thủ công Entity -> Domain
+        return jpaRepository.findById(id).map(this::toDomain);
     }
 
     @Override
     public boolean isRoomBusy(Long roomId, LocalDateTime startTime, LocalDateTime endTime) {
-        // Gọi query tùy chỉnh mà chúng ta đã viết
         return jpaRepository.findRoomOverlap(roomId, startTime, endTime);
     }
+
     @Override
     public List<Meeting> findAllByUserId(Long userId) {
-        // 1. Gọi query JPA
-        List<MeetingEntity> entities = jpaRepository.findAllByUserId(userId);
-
-        // 2. Map List<Entity> sang List<Domain Model>
-        return entities.stream()
-                .map(entity -> modelMapper.map(entity, Meeting.class))
+        return jpaRepository.findAllByUserId(userId).stream()
+                .map(this::toDomain) // Map thủ công
                 .collect(Collectors.toList());
     }
-    // BỔ SUNG: (US-22)
+
     @Override
     public List<Meeting> findConfirmedMeetingsInDateRange(LocalDateTime from, LocalDateTime to) {
-
-        List<MeetingEntity> entities = jpaRepository.findConfirmedMeetingsInDateRange(from, to);
-
-        return entities.stream()
-                .map(entity -> modelMapper.map(entity, Meeting.class))
+        return jpaRepository.findConfirmedMeetingsInDateRange(from, to).stream()
+                .map(this::toDomain) // Map thủ công
                 .collect(Collectors.toList());
+    }
+
+    // --- BỔ SUNG LẠI CÁC HÀM HELPER ---
+
+    /**
+     * Chuyển đổi Entity (DB) -> Domain (App)
+     * Map thủ công trường 'participants'
+     */
+    private Meeting toDomain(MeetingEntity entity) {
+        if (entity == null) return null;
+
+        // 1. Map các trường đơn giản
+        Meeting meeting = modelMapper.map(entity, Meeting.class);
+
+        // 2. Map thủ công 'participants' (Embeddable -> Domain)
+        Set<MeetingParticipant> participants = entity.getParticipants().stream()
+                .map(embeddable -> {
+                    // "Làm đầy" (Hydrate) User object
+                    User user = userRepository.findById(embeddable.getUserId()).orElse(null);
+                    if (user == null) return null; 
+                    return new MeetingParticipant(user, embeddable.getStatus(), embeddable.getResponseToken());
+                })
+                .filter(p -> p != null) 
+                .collect(Collectors.toSet());
+        meeting.setParticipants(participants);
+
+        return meeting;
+    }
+    
+    /**
+     * Chuyển đổi Domain (App) -> Entity (DB)
+     * Map thủ công trường 'participants'
+     */
+    private MeetingEntity toEntity(Meeting meeting) {
+        if (meeting == null) return null;
+        
+        // 1. Map các trường đơn giản
+        MeetingEntity entity = modelMapper.map(meeting, MeetingEntity.class);
+
+        // 2. Map thủ công 'participants' (Domain -> Embeddable)
+        Set<EmbeddableParticipant> embeddableParticipants = meeting.getParticipants().stream()
+                .map(participant -> {
+                    EmbeddableParticipant embeddable = new EmbeddableParticipant();
+                    embeddable.setUserId(participant.getUser().getId());
+                    embeddable.setStatus(participant.getStatus());
+                    embeddable.setResponseToken(participant.getResponseToken());
+                    return embeddable;
+                })
+                .collect(Collectors.toSet());
+        entity.setParticipants(embeddableParticipants);
+        
+        return entity;
+    }
+    @Override
+    public Optional<Meeting> findMeetingByParticipantToken(String token) {
+        return jpaRepository.findMeetingByParticipantToken(token)
+                .map(this::toDomain); // Dùng lại helper toDomain
     }
 }

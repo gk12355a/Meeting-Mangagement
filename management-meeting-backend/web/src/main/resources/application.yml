@@ -2,6 +2,8 @@ server:
   port: 8080
 
 spring:
+
+
   application:
     name: management-meeting-backend
 
@@ -37,6 +39,19 @@ spring:
   # === 4. TẮT FLYWAY ===
   flyway:
     enabled: false # Tắt Flyway để tránh xung đột
+  
+  # === BỔ SUNG: Cấu hình SMTP (Email) - DÙNG MAILTRAP ===
+  mail:
+    host: ${EMAIL_HOST}
+    port: ${EMAIL_PORT}
+    username: ${EMAIL_USERNAME}
+    password: ${EMAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 # === 5. Cấu hình Swagger UI ===
 springdoc:
