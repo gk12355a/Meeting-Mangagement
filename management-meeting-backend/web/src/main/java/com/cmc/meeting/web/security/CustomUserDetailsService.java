@@ -23,19 +23,18 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        
-        // 1. Dùng port của domain để tìm user
-        // (Đây là code đầy đủ, không còn "...")
         User domainUser = userRepository.findByUsername(username)
-                .orElseThrow(() -> 
-                        new UsernameNotFoundException("Không tìm thấy user: " + username));
+                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy user: " + username));
         
-        // 2. Convert Set<Role> (domain) sang Set<GrantedAuthority> (security)
+        // BỔ SUNG: Kiểm tra xem tài khoản có bị vô hiệu hóa không
+        if (!domainUser.isActive()) {
+            throw new UsernameNotFoundException("Tài khoản đã bị vô hiệu hóa.");
+        }
+        
         Set<GrantedAuthority> authorities = domainUser.getRoles().stream()
                 .map(role -> new SimpleGrantedAuthority(role.name()))
                 .collect(Collectors.toSet());
 
-        // 3. Trả về UserDetails đầy đủ với Mật khẩu và Quyền
         return new org.springframework.security.core.userdetails.User(
                 domainUser.getUsername(),
                 domainUser.getPassword(),

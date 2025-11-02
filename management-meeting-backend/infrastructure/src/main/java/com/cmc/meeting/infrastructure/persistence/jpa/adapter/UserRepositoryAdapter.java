@@ -7,7 +7,9 @@ import com.cmc.meeting.infrastructure.persistence.jpa.repository.SpringDataUserR
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Repository // Đánh dấu đây là 1 Bean của Spring
 public class UserRepositoryAdapter implements UserRepository {
@@ -44,5 +46,11 @@ public class UserRepositoryAdapter implements UserRepository {
         
         // 3. Map ngược từ Entity đã lưu -> Domain Model để trả về
         return modelMapper.map(savedEntity, User.class);
+    }
+    @Override
+    public List<User> findAll() {
+        return jpaRepository.findAll().stream()
+                .map(entity -> modelMapper.map(entity, User.class))
+                .collect(Collectors.toList());
     }
 }

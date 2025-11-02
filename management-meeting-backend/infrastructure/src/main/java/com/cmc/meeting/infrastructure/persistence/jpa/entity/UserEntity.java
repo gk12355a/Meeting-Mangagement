@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import java.util.Set; // Bổ sung
 import java.util.HashSet; // Bổ sung
-import jakarta.persistence.FetchType;
+
 @Data
 @Entity
 @Table(name = "users") // Đặt tên bảng là "users"
@@ -27,6 +27,7 @@ public class UserEntity {
     @Column(name = "role_name", nullable = false)
     @Enumerated(EnumType.STRING) // Lưu tên (vd: "ROLE_ADMIN")
     private Set<Role> roles = new HashSet<>();
-
-    // Chúng ta sẽ thêm password, roles... khi làm Security
+    @Column(nullable = false, columnDefinition = "BIT(1) DEFAULT 1")
+    private boolean isActive = true;
+  
 }

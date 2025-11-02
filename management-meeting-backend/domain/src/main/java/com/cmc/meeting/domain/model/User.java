@@ -17,4 +17,5 @@ public class User {
     private String fullName;
     private String password;
     private Set<Role> roles = new HashSet<>();
+    private boolean isActive = true; // us-18
 }
