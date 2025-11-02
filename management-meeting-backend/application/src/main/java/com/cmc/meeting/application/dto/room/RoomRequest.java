@@ -4,7 +4,8 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import java.util.List;
-
+import com.cmc.meeting.domain.model.Role; // Bổ sung
+import java.util.Set; // Bổ sung
 @Data
 public class RoomRequest {
 
@@ -17,4 +18,5 @@ public class RoomRequest {
     private String location;
 
     private List<String> fixedDevices; // (BS-14.2)
+    private Set<Role> requiredRoles;
 }

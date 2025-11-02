@@ -37,6 +37,7 @@ public class RoomServiceImpl implements RoomService {
     @Override
     public RoomDTO createRoom(RoomRequest request) {
         Room newRoom = modelMapper.map(request, Room.class);
+        // newRoom.setRequiredRoles(request.getRequiredRoles()); // ModelMapper tự làm
         Room savedRoom = roomRepository.save(newRoom);
         return modelMapper.map(savedRoom, RoomDTO.class);
     }
@@ -51,7 +52,7 @@ public class RoomServiceImpl implements RoomService {
         existingRoom.setCapacity(request.getCapacity());
         existingRoom.setLocation(request.getLocation());
         existingRoom.setFixedDevices(request.getFixedDevices());
-
+        existingRoom.setRequiredRoles(request.getRequiredRoles());
         Room updatedRoom = roomRepository.save(existingRoom);
         return modelMapper.map(updatedRoom, RoomDTO.class);
     }
@@ -65,6 +66,7 @@ public class RoomServiceImpl implements RoomService {
         // nhưng tạm thời cứ xóa)
         roomRepository.deleteById(id);
     }
+
     // BỔ SUNG: (US-26)
     @Override
     @Transactional(readOnly = true)

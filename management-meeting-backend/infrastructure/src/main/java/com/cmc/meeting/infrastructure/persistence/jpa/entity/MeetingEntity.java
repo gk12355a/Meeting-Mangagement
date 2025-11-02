@@ -9,7 +9,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
-
+import com.cmc.meeting.domain.model.Role;
 @Data
 @Entity
 @Table(name = "meetings")
@@ -69,4 +69,10 @@ public class MeetingEntity {
 
     @Column(nullable = true, length = 36) // UUID
     private String seriesId;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "room_required_roles", joinColumns = @JoinColumn(name = "room_id"))
+    @Column(name = "role_name", nullable = false)
+    @Enumerated(EnumType.STRING)
+    private Set<Role> requiredRoles = new HashSet<>();
 }
