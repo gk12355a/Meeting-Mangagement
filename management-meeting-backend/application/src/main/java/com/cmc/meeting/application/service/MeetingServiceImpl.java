@@ -1,5 +1,6 @@
 package com.cmc.meeting.application.service;
 
+// Imports cho DTOs (Request & Response)
 import com.cmc.meeting.application.dto.meeting.CheckInRequest;
 import com.cmc.meeting.application.dto.meeting.MeetingCancelRequest;
 import com.cmc.meeting.application.dto.meeting.MeetingResponseRequest;
@@ -8,15 +9,21 @@ import com.cmc.meeting.application.dto.request.MeetingUpdateRequest;
 import com.cmc.meeting.application.dto.response.MeetingDTO;
 import com.cmc.meeting.application.dto.recurrence.RecurrenceRuleDTO;
 import com.cmc.meeting.application.dto.timeslot.TimeSlotDTO;
+
+// Imports cho Ports (Hợp đồng)
 import com.cmc.meeting.application.port.service.MeetingService;
-import com.cmc.meeting.domain.event.MeetingCreatedEvent;
-import com.cmc.meeting.domain.exception.MeetingConflictException;
-import com.cmc.meeting.domain.exception.PolicyViolationException;
-import com.cmc.meeting.domain.model.*; // Import tất cả model (gồm cả Role)
 import com.cmc.meeting.domain.port.repository.DeviceRepository;
 import com.cmc.meeting.domain.port.repository.MeetingRepository;
 import com.cmc.meeting.domain.port.repository.RoomRepository;
 import com.cmc.meeting.domain.port.repository.UserRepository;
+
+// Imports cho Domain (Lõi nghiệp vụ)
+import com.cmc.meeting.domain.event.MeetingCreatedEvent;
+import com.cmc.meeting.domain.exception.MeetingConflictException;
+import com.cmc.meeting.domain.exception.PolicyViolationException;
+import com.cmc.meeting.domain.model.*; // Import tất cả (Meeting, User, Room, Role, Device, Status...)
+
+// Imports cho Java & Spring
 import jakarta.persistence.EntityNotFoundException;
 import org.modelmapper.ModelMapper;
 import org.slf4j.Logger;
@@ -37,15 +44,20 @@ import java.util.stream.Collectors;
 @Transactional
 public class MeetingServiceImpl implements MeetingService {
 
+    // Logger
     private static final Logger log = LoggerFactory.getLogger(MeetingServiceImpl.class);
 
+    // Repositories (Ports)
     private final MeetingRepository meetingRepository;
     private final RoomRepository roomRepository;
     private final UserRepository userRepository;
+    private final DeviceRepository deviceRepository;
+    
+    // Services & Utilities
     private final ModelMapper modelMapper;
     private final ApplicationEventPublisher eventPublisher;
-    private final DeviceRepository deviceRepository;
 
+    // Constructor Injection
     public MeetingServiceImpl(MeetingRepository meetingRepository,
                             RoomRepository roomRepository,
                             UserRepository userRepository,
@@ -60,17 +72,28 @@ public class MeetingServiceImpl implements MeetingService {
         this.deviceRepository = deviceRepository;
     }
 
-
     /**
-     * (US-1 & US-3)
+     * (US-1, US-3, BS-20.1) Tạo cuộc họp (Đơn lẻ, Định kỳ, Đặt thay)
      */
     @Override
-    public MeetingDTO createMeeting(MeetingCreationRequest request, Long organizerId) {
+    public MeetingDTO createMeeting(MeetingCreationRequest request, Long currentUserId) {
         
         // --- 1. Lấy Dữ liệu chung ---
-        User organizer = userRepository.findById(organizerId)
-                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy người tổ chức"));
+        User creator = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy người tạo (creator)"));
         
+        // (BS-20.1) Xác định Người tổ chức (Organizer)
+        User organizer;
+        if (request.getOnBehalfOfUserId() != null) {
+            // Đặt lịch thay
+            // TODO: Kiểm tra xem 'creator' có quyền 'ROLE_SECRETARY' để đặt thay không
+            organizer = userRepository.findById(request.getOnBehalfOfUserId())
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy người tổ chức (onBehalfOf)"));
+        } else {
+            // Tự đặt
+            organizer = creator;
+        }
+
         Room room = roomRepository.findById(request.getRoomId())
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy phòng họp"));
 
@@ -88,10 +111,10 @@ public class MeetingServiceImpl implements MeetingService {
         if (request.getRecurrenceRule() == null) {
             // --- A. HỌP 1 LẦN ---
             checkAccessAndConflicts(room, organizer, participants, request.getStartTime(), request.getEndTime());
-            return createSingleMeeting(request, room, organizer, participants, devices, null);
+            return createSingleMeeting(request, room, creator, organizer, participants, devices, null);
             
         } else {
-            // --- B. HỌP ĐỊNH KỲ ---
+            // --- B. HỌP ĐỊNH KỲ (US-3) ---
             String seriesId = UUID.randomUUID().toString();
             List<TimeSlotDTO> slots = calculateRecurrenceSlots(
                     request.getStartTime(), 
@@ -99,10 +122,12 @@ public class MeetingServiceImpl implements MeetingService {
                     request.getRecurrenceRule()
             );
 
+            // Kiểm tra xung đột cho TẤT CẢ các slot
             for (TimeSlotDTO slot : slots) {
                 checkAccessAndConflicts(room, organizer, participants, slot.getStartTime(), slot.getEndTime());
             }
 
+            // Tạo hàng loạt
             List<MeetingDTO> createdMeetings = new ArrayList<>();
             for (TimeSlotDTO slot : slots) {
                 MeetingCreationRequest singleRequest = modelMapper.map(request, MeetingCreationRequest.class);
@@ -110,113 +135,22 @@ public class MeetingServiceImpl implements MeetingService {
                 singleRequest.setEndTime(slot.getEndTime());
                 
                 createdMeetings.add(
-                    createSingleMeeting(singleRequest, room, organizer, participants, devices, seriesId)
+                    createSingleMeeting(singleRequest, room, creator, organizer, participants, devices, seriesId)
                 );
             }
-            
             return createdMeetings.get(0);
         }
     }
 
     /**
-     * HELPER 1: Logic tạo 1 cuộc họp
+     * (US-2) Hủy lịch họp
      */
-    private MeetingDTO createSingleMeeting(MeetingCreationRequest request, Room room, User organizer, 
-                                           Set<User> participants, Set<Device> devices, String seriesId) {
-
-        Meeting newMeeting = new Meeting(
-                request.getTitle(),
-                request.getStartTime(),
-                request.getEndTime(),
-                room,
-                organizer,
-                participants,
-                devices,
-                seriesId
-        );
-        
-        Meeting savedMeeting = meetingRepository.save(newMeeting);
-        eventPublisher.publishEvent(new MeetingCreatedEvent(savedMeeting.getId()));
-        return modelMapper.map(savedMeeting, MeetingDTO.class);
-    }
-
-    /**
-     * HELPER 2 (ĐÃ SỬA): Logic kiểm tra Xung đột VÀ Quyền (US-21)
-     */
-    private void checkAccessAndConflicts(Room room, User organizer, Set<User> participants, 
-                                         LocalDateTime startTime, LocalDateTime endTime) {
-        
-        // 1. KIỂM TRA QUYỀN ĐẶT PHÒNG (US-21)
-        Set<Role> requiredRoles = room.getRequiredRoles();
-        if (requiredRoles != null && !requiredRoles.isEmpty()) {
-            Set<Role> userRoles = organizer.getRoles();
-            boolean hasPermission = userRoles.stream().anyMatch(requiredRoles::contains);
-            
-            if (!hasPermission) {
-                throw new PolicyViolationException(
-                    String.format("Bạn không có quyền (ví dụ: ROLE_VIP) để đặt phòng '%s'", room.getName())
-                );
-            }
-        }
-        
-        // 2. KIỂM TRA XUNG ĐỘT (Code cũ)
-        // Kiểm tra phòng
-        if (meetingRepository.isRoomBusy(room.getId(), startTime, endTime)) {
-            throw new MeetingConflictException(
-                String.format("Phòng đã bị đặt vào lúc %s", startTime)
-            );
-        }
-        
-        // Kiểm tra người
-        Set<Long> userIds = participants.stream().map(User::getId).collect(Collectors.toSet());
-        List<Meeting> conflictingUserMeetings = meetingRepository
-                .findMeetingsForUsersInDateRange(userIds, startTime, endTime); // <-- Sửa lỗi 2
-        
-        if (!conflictingUserMeetings.isEmpty()) {
-            throw new MeetingConflictException(
-                String.format("Người tham dự bị trùng lịch vào lúc %s", startTime) // <-- Sửa lỗi 3
-            );
-        }
-    }
-
-    /**
-     * HELPER 3: Thuật toán tính toán các slot định kỳ
-     */
-    private List<TimeSlotDTO> calculateRecurrenceSlots(LocalDateTime firstStartTime, 
-                                                       LocalDateTime firstEndTime, 
-                                                       RecurrenceRuleDTO rule) {
-        List<TimeSlotDTO> slots = new ArrayList<>();
-        long durationMinutes = java.time.Duration.between(firstStartTime, firstEndTime).toMinutes();
-
-        LocalDateTime currentStartTime = firstStartTime;
-
-        while (!currentStartTime.toLocalDate().isAfter(rule.getRepeatUntil())) {
-            
-            LocalDateTime currentEndTime = currentStartTime.plusMinutes(durationMinutes);
-            slots.add(new TimeSlotDTO(currentStartTime, currentEndTime));
-
-            switch (rule.getFrequency()) {
-                case DAILY:
-                    currentStartTime = currentStartTime.plusDays(rule.getInterval());
-                    break;
-                case WEEKLY:
-                    currentStartTime = currentStartTime.plusWeeks(rule.getInterval());
-                    break;
-                case MONTHLY:
-                    currentStartTime = currentStartTime.plusMonths(rule.getInterval());
-                    break;
-            }
-        }
-        return slots;
-    }
-
-    // --- CÁC NGHIỆP VỤ KHÁC ---
-    
     @Override
     public void cancelMeeting(Long meetingId, MeetingCancelRequest request, Long currentUserId) {
         Meeting meeting = meetingRepository.findById(meetingId)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy cuộc họp với ID: " + meetingId));
 
+        // CHỈ người tổ chức mới được hủy
         if (!meeting.getOrganizer().getId().equals(currentUserId)) {
             throw new PolicyViolationException("Chỉ người tổ chức mới có quyền hủy cuộc họp này.");
         }
@@ -225,12 +159,16 @@ public class MeetingServiceImpl implements MeetingService {
         meetingRepository.save(meeting);
     }
 
+    /**
+     * (US-2) Sửa lịch họp
+     */
     @Override
     public MeetingDTO updateMeeting(Long meetingId, MeetingUpdateRequest request, Long currentUserId) {
         
         Meeting meeting = meetingRepository.findById(meetingId)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy cuộc họp với ID: " + meetingId));
 
+        // CHỈ người tổ chức mới được sửa
         if (!meeting.getOrganizer().getId().equals(currentUserId)) {
             throw new PolicyViolationException("Chỉ người tổ chức mới có quyền sửa cuộc họp này.");
         }
@@ -245,35 +183,32 @@ public class MeetingServiceImpl implements MeetingService {
         Room newRoom = roomRepository.findById(request.getRoomId())
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy phòng họp"));
                 
-        // (Kiểm tra xung đột cho phòng mới)
-        if (meetingRepository.isRoomBusy(request.getRoomId(), request.getStartTime(), request.getEndTime()) &&
-            !meeting.getRoom().getId().equals(request.getRoomId())) {
-             throw new MeetingConflictException("Phòng đã bị đặt trong khung giờ này.");
-        }
-
         Set<User> newParticipantUsers = request.getParticipantIds().stream()
                 .map(id -> userRepository.findById(id)
                         .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy người tham dự với ID: " + id)))
                 .collect(Collectors.toSet());
-
-        Set<MeetingParticipant> newParticipants = new HashSet<>();
-        User organizer = meeting.getOrganizer();
-        
-        newParticipants.add(new MeetingParticipant(organizer, ParticipantStatus.ACCEPTED, null));
-
-        newParticipantUsers.forEach(user -> {
-            if (!user.getId().equals(organizer.getId())) {
-                newParticipants.add(
-                    new MeetingParticipant(user, ParticipantStatus.PENDING, java.util.UUID.randomUUID().toString())
-                );
-            }
-        });
 
         Set<Device> newDevices = request.getDeviceIds().stream()
                 .map(id -> deviceRepository.findById(id)
                         .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy thiết bị với ID: " + id)))
                 .collect(Collectors.toSet());
 
+        // Kiểm tra quyền và xung đột cho phòng/thời gian MỚI
+        checkAccessAndConflicts(newRoom, meeting.getOrganizer(), newParticipantUsers, request.getStartTime(), request.getEndTime());
+
+        // Chuyển đổi sang Set<MeetingParticipant>
+        Set<MeetingParticipant> newParticipants = new HashSet<>();
+        User organizer = meeting.getOrganizer();
+        newParticipants.add(new MeetingParticipant(organizer, ParticipantStatus.ACCEPTED, null));
+        newParticipantUsers.forEach(user -> {
+            if (!user.getId().equals(organizer.getId())) {
+                newParticipants.add(
+                    new MeetingParticipant(user, ParticipantStatus.PENDING, UUID.randomUUID().toString())
+                );
+            }
+        });
+
+        // Cập nhật các trường
         meeting.setTitle(request.getTitle());
         meeting.setDescription(request.getDescription());
         meeting.setStartTime(request.getStartTime());
@@ -286,14 +221,17 @@ public class MeetingServiceImpl implements MeetingService {
         return modelMapper.map(updatedMeeting, MeetingDTO.class);
     }
     
+    /**
+     * Lấy chi tiết cuộc họp
+     */
     @Override
     @Transactional(readOnly = true)
     public MeetingDTO getMeetingById(Long meetingId, Long currentUserId) {
         Meeting meeting = meetingRepository.findById(meetingId)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy cuộc họp với ID: " + meetingId));
 
+        // Kiểm tra quyền: Phải là người tổ chức hoặc người tham dự
         boolean isOrganizer = meeting.getOrganizer().getId().equals(currentUserId);
-        
         boolean isParticipant = meeting.getParticipants().stream()
                 .anyMatch(p -> p.getUser().getId().equals(currentUserId)); 
 
@@ -304,6 +242,9 @@ public class MeetingServiceImpl implements MeetingService {
         return modelMapper.map(meeting, MeetingDTO.class);
     }
 
+    /**
+     * (US-6) Lấy danh sách cuộc họp của tôi
+     */
     @Override
     @Transactional(readOnly = true)
     public List<MeetingDTO> getMyMeetings(Long currentUserId) {
@@ -313,6 +254,9 @@ public class MeetingServiceImpl implements MeetingService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * (BS-1.1) Phản hồi lời mời
+     */
     @Override
     public void respondToInvitation(Long meetingId, MeetingResponseRequest request, Long currentUserId) {
         if (request.getStatus() == ParticipantStatus.PENDING) {
@@ -320,7 +264,7 @@ public class MeetingServiceImpl implements MeetingService {
         }
 
         Meeting meeting = meetingRepository.findById(meetingId)
-                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy cuộc họp với ID: " + meetingId)); // <-- ĐÃ XÓA "d"
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy cuộc họp với ID: " + meetingId));
 
         User currentUser = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy user"));
@@ -329,6 +273,9 @@ public class MeetingServiceImpl implements MeetingService {
         meetingRepository.save(meeting);
     }
 
+    /**
+     * (US-27) Check-in
+     */
     @Override
     public String checkIn(CheckInRequest request, Long currentUserId) {
         Meeting meeting = meetingRepository.findCheckInEligibleMeeting(
@@ -346,6 +293,9 @@ public class MeetingServiceImpl implements MeetingService {
         return String.format("Check-in thành công cho cuộc họp: %s", meeting.getTitle());
     }
 
+    /**
+     * Phản hồi qua link (Không cần Token)
+     */
     @Override
     public String respondByLink(String token, ParticipantStatus status) {
         if (status == ParticipantStatus.PENDING) {
@@ -371,6 +321,9 @@ public class MeetingServiceImpl implements MeetingService {
         }
     }
 
+    /**
+     * (US-3) Hủy chuỗi lịch định kỳ
+     */
     @Override
     public void cancelMeetingSeries(String seriesId, MeetingCancelRequest request, Long currentUserId) {
         List<Meeting> meetingsInSeries = meetingRepository.findAllBySeriesId(seriesId);
@@ -379,6 +332,7 @@ public class MeetingServiceImpl implements MeetingService {
             throw new EntityNotFoundException("Không tìm thấy chuỗi cuộc họp.");
         }
 
+        // Kiểm tra quyền (chỉ cần check 1 cuộc)
         Meeting firstMeeting = meetingsInSeries.get(0);
         if (!firstMeeting.getOrganizer().getId().equals(currentUserId)) {
             throw new PolicyViolationException("Chỉ người tổ chức mới có quyền hủy chuỗi họp này.");
@@ -387,6 +341,7 @@ public class MeetingServiceImpl implements MeetingService {
         log.info("Hủy chuỗi {}: Tìm thấy {} cuộc họp.", seriesId, meetingsInSeries.size());
         
         for (Meeting meeting : meetingsInSeries) {
+            // Chỉ hủy các cuộc họp trong tương lai và chưa bị hủy
             if (meeting.getStartTime().isAfter(LocalDateTime.now()) && 
                 meeting.getStatus() == BookingStatus.CONFIRMED) {
                 
@@ -395,5 +350,112 @@ public class MeetingServiceImpl implements MeetingService {
                 meetingRepository.save(meeting);
             }
         }
+    }
+
+
+    // --- CÁC HÀM HELPER (Private) ---
+
+    /**
+     * HELPER 1: Logic tạo 1 cuộc họp
+     */
+    private MeetingDTO createSingleMeeting(MeetingCreationRequest request, Room room, 
+                                           User creator, User organizer,
+                                           Set<User> participants, Set<Device> devices, String seriesId) {
+
+        Meeting newMeeting = new Meeting(
+                request.getTitle(),
+                request.getStartTime(),
+                request.getEndTime(),
+                room,
+                creator,
+                organizer,
+                participants,
+                devices,
+                seriesId
+        );
+        
+        Meeting savedMeeting = meetingRepository.save(newMeeting);
+        eventPublisher.publishEvent(new MeetingCreatedEvent(savedMeeting.getId()));
+        return modelMapper.map(savedMeeting, MeetingDTO.class);
+    }
+
+    /**
+     * HELPER 2: Logic kiểm tra Xung đột VÀ Quyền (US-21)
+     */
+    private void checkAccessAndConflicts(Room room, User organizer, Set<User> participants, 
+                                         LocalDateTime startTime, LocalDateTime endTime) {
+        
+        // 1. KIỂM TRA QUYỀN ĐẶT PHÒNG (US-21)
+        Set<Role> requiredRoles = room.getRequiredRoles();
+        if (requiredRoles != null && !requiredRoles.isEmpty()) {
+            Set<Role> userRoles = organizer.getRoles();
+            boolean hasPermission = userRoles.stream().anyMatch(requiredRoles::contains);
+            
+            if (!hasPermission) {
+                throw new PolicyViolationException(
+                    String.format("Người tổ chức (%s) không có quyền đặt phòng '%s'", 
+                        organizer.getFullName(), room.getName())
+                );
+            }
+        }
+        
+        // 2. KIỂM TRA XUNG ĐỘT (Phòng)
+        if (meetingRepository.isRoomBusy(room.getId(), startTime, endTime)) {
+            throw new MeetingConflictException(
+                String.format("Phòng '%s' đã bị đặt vào lúc %s", room.getName(), startTime)
+            );
+        }
+        
+        // 3. KIỂM TRA XUNG ĐỘT (Người)
+        Set<Long> userIdsToCheck = participants.stream()
+                                            .map(User::getId)
+                                            .collect(Collectors.toSet());
+        userIdsToCheck.add(organizer.getId()); // Thêm cả organizer vào danh sách check
+        
+        List<Meeting> conflictingUserMeetings = meetingRepository
+                .findMeetingsForUsersInDateRange(userIdsToCheck, startTime, endTime); 
+        
+        if (!conflictingUserMeetings.isEmpty()) {
+            // Tìm xem ai là người bị trùng
+            String conflictingUser = conflictingUserMeetings.get(0).getParticipants().stream()
+                .map(p -> p.getUser().getFullName())
+                .collect(Collectors.joining(", "));
+            
+            throw new MeetingConflictException(
+                String.format("Người tham dự (%s) bị trùng lịch vào lúc %s", conflictingUser, startTime)
+            );
+        }
+    }
+
+    /**
+     * HELPER 3: Thuật toán tính toán các slot định kỳ (US-3)
+     */
+    private List<TimeSlotDTO> calculateRecurrenceSlots(LocalDateTime firstStartTime, 
+                                                       LocalDateTime firstEndTime, 
+                                                       RecurrenceRuleDTO rule) {
+        List<TimeSlotDTO> slots = new ArrayList<>();
+        long durationMinutes = java.time.Duration.between(firstStartTime, firstEndTime).toMinutes();
+
+        LocalDateTime currentStartTime = firstStartTime;
+
+        while (!currentStartTime.toLocalDate().isAfter(rule.getRepeatUntil())) {
+            
+            LocalDateTime currentEndTime = currentStartTime.plusMinutes(durationMinutes);
+            slots.add(new TimeSlotDTO(currentStartTime, currentEndTime));
+
+            // Tính toán lần lặp tiếp theo
+            switch (rule.getFrequency()) {
+                case DAILY:
+                    currentStartTime = currentStartTime.plusDays(rule.getInterval());
+                    break;
+                case WEEKLY:
+                    currentStartTime = currentStartTime.plusWeeks(rule.getInterval());
+                    break;
+                case MONTHLY:
+                    currentStartTime = currentStartTime.plusMonths(rule.getInterval());
+                    break;
+            }
+        }
+        return slots;
     }
 }

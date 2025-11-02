@@ -27,29 +27,31 @@ public class Meeting {
     private boolean isCheckedIn = false;
     private String cancelReason;
     private LocalDateTime cancelledAt;
+    private User creator; // Người tạo (vd: Thư ký, người nhấn nút)
     // BỔ SUNG: (US-12)
     private Set<Device> devices = new HashSet<>();
 
     // Constructor cho nghiệp vụ tạo mới
     public Meeting(String title, LocalDateTime startTime, LocalDateTime endTime,
-            Room room, User organizer, Set<User> participantUsers, Set<Device> devices, String seriesId) {
+            Room room, User organizer, User creator, Set<User> participantUsers, Set<Device> devices, String seriesId) {
         this.title = title;
         this.startTime = startTime;
         this.endTime = endTime;
         this.room = room;
         this.organizer = organizer;
+        this.creator = creator;
         this.status = BookingStatus.CONFIRMED;
         this.isCheckedIn = false;
         this.seriesId = seriesId;
-
-        // Tự động thêm Người tổ chức (Organizer) là ACCEPTED
-        this.participants.add(new MeetingParticipant(organizer, ParticipantStatus.ACCEPTED, null));
         this.devices = devices;
+        // Tự động thêm Người tổ chức (Organizer) là ACCEPTED
+        this.participants.add(
+                new MeetingParticipant(organizer, ParticipantStatus.ACCEPTED, null));
 
         participantUsers.forEach(user -> {
             if (!user.getId().equals(organizer.getId())) {
-                this.participants
-                        .add(new MeetingParticipant(user, ParticipantStatus.PENDING, UUID.randomUUID().toString()));
+                this.participants.add(
+                        new MeetingParticipant(user, ParticipantStatus.PENDING, UUID.randomUUID().toString()));
             }
         });
     }

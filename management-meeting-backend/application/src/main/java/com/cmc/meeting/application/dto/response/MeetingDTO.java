@@ -19,6 +19,7 @@ public class MeetingDTO {
 
     // Trả về thông tin chi tiết (chúng ta sẽ tạo UserDTO và RoomDTO sau)
     private RoomDTO room;
+    private UserDTO creator;
     private UserDTO organizer;
     private Set<UserDTO> participants;
 

@@ -41,4 +41,5 @@ public class MeetingCreationRequest {
     // BỔ SUNG: (US-3)
     @Valid // Validate lồng
     private RecurrenceRuleDTO recurrenceRule; // (Nếu = null, là họp 1 lần)
+    private Long onBehalfOfUserId;
 }
