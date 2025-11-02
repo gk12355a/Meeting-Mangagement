@@ -1,6 +1,7 @@
 package com.cmc.meeting.web.controller;
 
 import com.cmc.meeting.application.dto.request.MeetingCreationRequest;
+import com.cmc.meeting.application.dto.request.MeetingUpdateRequest;
 import com.cmc.meeting.application.dto.response.MeetingDTO;
 import com.cmc.meeting.application.port.service.MeetingService;
 // BỔ SUNG: Import 2 thư viện này
@@ -15,7 +16,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
-import org.springframework.web.bind.annotation.GetMapping;
 @RestController
 @RequestMapping("/api/v1/meetings")
 @Tag(name = "Meeting API", description = "API quản lý lịch họp")
@@ -106,5 +106,24 @@ public class MeetingController {
         List<MeetingDTO> meetings = meetingService.getMyMeetings(currentUser.getId());
         
         return ResponseEntity.ok(meetings); // 200 OK
+    }
+    /**
+     * API Cập nhật/Sửa một lịch họp (US-2)
+     */
+    @PutMapping("/{id}") // Dùng phương thức PUT
+    @Operation(summary = "Cập nhật một lịch họp (chỉ người tổ chức)")
+    public ResponseEntity<MeetingDTO> updateMeeting(
+            @PathVariable Long id, // Lấy ID từ URL
+            @Valid @RequestBody MeetingUpdateRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        
+        // 1. Lấy ID user từ token
+        com.cmc.meeting.domain.model.User currentUser = userRepository.findByUsername(userDetails.getUsername())
+                .orElseThrow(() -> new RuntimeException("Lỗi: Không tìm thấy user từ token"));
+        
+        // 2. Gọi service
+        MeetingDTO updatedMeeting = meetingService.updateMeeting(id, request, currentUser.getId());
+        
+        return ResponseEntity.ok(updatedMeeting); // 200 OK
     }
 }
