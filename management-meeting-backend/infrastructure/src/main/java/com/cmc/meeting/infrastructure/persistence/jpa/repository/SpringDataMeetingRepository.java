@@ -50,4 +50,10 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
             @Param("roomId") Long roomId,
             @Param("timeStartWindow") LocalDateTime timeStartWindow, // vd: now - 15 phút
             @Param("timeEndWindow") LocalDateTime timeEndWindow); // vd: now + 30 phút
+    @Query("SELECT m FROM MeetingEntity m " +
+           "WHERE m.status = 'CONFIRMED' " +
+           "AND m.isCheckedIn = false " +
+           // startTime đã qua thời gian cutoff (vd: 15 phút)
+           "AND m.startTime < :cutoffTime") 
+    List<MeetingEntity> findUncheckedInMeetings(@Param("cutoffTime") LocalDateTime cutoffTime);
 }

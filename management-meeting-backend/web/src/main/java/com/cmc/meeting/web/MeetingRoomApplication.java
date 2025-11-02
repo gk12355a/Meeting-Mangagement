@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.domain.EntityScan; // <-- 2. Impor
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories; // <-- 3. Import mới
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
 
@@ -26,6 +27,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 @MapperScan(basePackages = "com.cmc.meeting.infrastructure.persistence.mybatis.mapper")
 
 @EnableAsync
+@EnableScheduling
 public class MeetingRoomApplication {
 
     public static void main(String[] args) {

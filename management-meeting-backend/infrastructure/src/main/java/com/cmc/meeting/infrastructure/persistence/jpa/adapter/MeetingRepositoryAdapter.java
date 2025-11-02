@@ -140,4 +140,10 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
                     timeEndWindow)
                 .map(this::toDomain); // Dùng lại helper toDomain
     }
+    @Override
+    public List<Meeting> findUncheckedInMeetings(LocalDateTime cutoffTime) {
+        return jpaRepository.findUncheckedInMeetings(cutoffTime).stream()
+                .map(this::toDomain) // Dùng lại helper toDomain
+                .collect(Collectors.toList());
+    }
 }
