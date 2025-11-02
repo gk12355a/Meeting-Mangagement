@@ -26,4 +26,12 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
            "LEFT JOIN m.participants p " +
            "WHERE m.organizer.id = :userId OR p.id = :userId")
     List<MeetingEntity> findAllByUserId(@Param("userId") Long userId);
+    // BỔ SUNG: (US-22)
+    // Tìm các cuộc họp đã 'CONFIRMED' nằm trong khoảng thời gian
+    @Query("SELECT m FROM MeetingEntity m " +
+           "WHERE m.status = 'CONFIRMED' " +
+           "AND m.startTime >= :from AND m.endTime <= :to")
+    List<MeetingEntity> findConfirmedMeetingsInDateRange(
+            @Param("from") LocalDateTime from, 
+            @Param("to") LocalDateTime to);
 }

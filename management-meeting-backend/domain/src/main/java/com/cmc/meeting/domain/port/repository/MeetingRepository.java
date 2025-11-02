@@ -18,4 +18,5 @@ public interface MeetingRepository {
     // ví dụ: boolean isRoomBusy(Long roomId, LocalDateTime start, LocalDateTime end);
     boolean isRoomBusy(Long roomId, LocalDateTime startTime, LocalDateTime endTime);
     List<Meeting> findAllByUserId(Long userId);
+    List<Meeting> findConfirmedMeetingsInDateRange(LocalDateTime from, LocalDateTime to);
 }

@@ -56,4 +56,14 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
                 .map(entity -> modelMapper.map(entity, Meeting.class))
                 .collect(Collectors.toList());
     }
+    // BỔ SUNG: (US-22)
+    @Override
+    public List<Meeting> findConfirmedMeetingsInDateRange(LocalDateTime from, LocalDateTime to) {
+
+        List<MeetingEntity> entities = jpaRepository.findConfirmedMeetingsInDateRange(from, to);
+
+        return entities.stream()
+                .map(entity -> modelMapper.map(entity, Meeting.class))
+                .collect(Collectors.toList());
+    }
 }
