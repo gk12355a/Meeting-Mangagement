@@ -1,5 +1,6 @@
 package com.cmc.meeting.application.dto.request;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -8,6 +9,8 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 import java.util.Set;
+
+import com.cmc.meeting.application.dto.recurrence.RecurrenceRuleDTO;
 
 @Data
 public class MeetingCreationRequest {
@@ -35,4 +38,7 @@ public class MeetingCreationRequest {
 
     // BỔ SUNG TRƯỜNG CÒN THIẾU
     private Set<Long> deviceIds;
+    // BỔ SUNG: (US-3)
+    @Valid // Validate lồng
+    private RecurrenceRuleDTO recurrenceRule; // (Nếu = null, là họp 1 lần)
 }

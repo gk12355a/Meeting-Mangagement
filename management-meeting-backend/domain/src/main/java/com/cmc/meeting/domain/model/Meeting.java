@@ -2,13 +2,13 @@ package com.cmc.meeting.domain.model;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import com.cmc.meeting.domain.model.Device;
 import com.cmc.meeting.domain.exception.PolicyViolationException;
 // import com.cmc.meeting.domain.model.MeetingParticipant;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+
 @Data
 @NoArgsConstructor
 public class Meeting {
@@ -21,7 +21,7 @@ public class Meeting {
 
     private Room room; // Phòng họp được đặt
     private User organizer; // Người tổ chức
-
+    private String seriesId;
     private Set<MeetingParticipant> participants = new HashSet<>(); // Người tham dự
     private BookingStatus status;
     private boolean isCheckedIn = false;
@@ -32,7 +32,7 @@ public class Meeting {
 
     // Constructor cho nghiệp vụ tạo mới
     public Meeting(String title, LocalDateTime startTime, LocalDateTime endTime,
-            Room room, User organizer, Set<User> participantUsers,Set<Device> devices) {
+            Room room, User organizer, Set<User> participantUsers, Set<Device> devices, String seriesId) {
         this.title = title;
         this.startTime = startTime;
         this.endTime = endTime;
@@ -40,19 +40,16 @@ public class Meeting {
         this.organizer = organizer;
         this.status = BookingStatus.CONFIRMED;
         this.isCheckedIn = false;
+        this.seriesId = seriesId;
 
         // Tự động thêm Người tổ chức (Organizer) là ACCEPTED
-        this.participants.add(
-            new MeetingParticipant(organizer, ParticipantStatus.ACCEPTED, null) // Token là null
-        );
+        this.participants.add(new MeetingParticipant(organizer, ParticipantStatus.ACCEPTED, null));
         this.devices = devices;
-        
+
         participantUsers.forEach(user -> {
             if (!user.getId().equals(organizer.getId())) {
-                // Gán token ngẫu nhiên cho người PENDING
-                this.participants.add(
-                    new MeetingParticipant(user, ParticipantStatus.PENDING, UUID.randomUUID().toString())
-                );
+                this.participants
+                        .add(new MeetingParticipant(user, ParticipantStatus.PENDING, UUID.randomUUID().toString()));
             }
         });
     }

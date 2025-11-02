@@ -10,8 +10,6 @@ import com.cmc.meeting.infrastructure.persistence.jpa.entity.DeviceEntity;
 import com.cmc.meeting.infrastructure.persistence.jpa.entity.MeetingEntity;
 import com.cmc.meeting.infrastructure.persistence.jpa.embeddable.EmbeddableParticipant; // Bổ sung
 import com.cmc.meeting.infrastructure.persistence.jpa.repository.SpringDataMeetingRepository;
-import com.cmc.meeting.domain.model.Device;
-import com.cmc.meeting.infrastructure.persistence.jpa.entity.DeviceEntity;
 import jakarta.annotation.PostConstruct;
 
 // Bỏ: @PostConstruct

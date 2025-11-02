@@ -66,4 +66,7 @@ public class MeetingEntity {
         inverseJoinColumns = @JoinColumn(name = "device_id")
     )
     private Set<DeviceEntity> devices = new HashSet<>();
+
+    @Column(nullable = true, length = 36) // UUID
+    private String seriesId;
 }
