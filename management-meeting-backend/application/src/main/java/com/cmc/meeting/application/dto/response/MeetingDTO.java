@@ -1,5 +1,6 @@
 package com.cmc.meeting.application.dto.response;
 
+import com.cmc.meeting.application.dto.device.DeviceDTO;
 import com.cmc.meeting.domain.model.BookingStatus;
 import lombok.Data;
 
@@ -35,4 +36,6 @@ public class MeetingDTO {
         private Long id;
         private String fullName;
     }
+
+    private Set<DeviceDTO> devices;
 }

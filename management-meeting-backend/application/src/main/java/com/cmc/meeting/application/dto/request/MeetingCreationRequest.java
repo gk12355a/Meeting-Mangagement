@@ -29,11 +29,10 @@ public class MeetingCreationRequest {
     @NotNull(message = "Phải chọn phòng họp")
     private Long roomId;
 
-    // Organizer (người tổ chức) sẽ được lấy từ token, không cần truyền vào
-
     @NotNull(message = "Phải có ít nhất 1 người tham dự")
     @Size(min = 1, message = "Phải mời ít nhất 1 người")
     private Set<Long> participantIds; 
 
-    // TODO: Thêm 1 annotation tùy chỉnh để validate (endTime > startTime)
+    // BỔ SUNG TRƯỜNG CÒN THIẾU
+    private Set<Long> deviceIds;
 }

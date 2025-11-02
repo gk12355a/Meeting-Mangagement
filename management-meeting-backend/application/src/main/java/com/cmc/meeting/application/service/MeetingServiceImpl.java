@@ -6,11 +6,13 @@ import com.cmc.meeting.application.dto.meeting.MeetingResponseRequest;
 import com.cmc.meeting.application.dto.request.MeetingCreationRequest;
 import com.cmc.meeting.application.dto.request.MeetingUpdateRequest;
 import com.cmc.meeting.application.dto.response.MeetingDTO;
+import com.cmc.meeting.domain.model.Device;
 import com.cmc.meeting.domain.model.Meeting;
 import com.cmc.meeting.domain.model.MeetingParticipant;
 import com.cmc.meeting.domain.model.ParticipantStatus;
 import com.cmc.meeting.domain.model.Room;
 import com.cmc.meeting.domain.model.User;
+import com.cmc.meeting.domain.port.repository.DeviceRepository;
 import com.cmc.meeting.domain.port.repository.MeetingRepository;
 import com.cmc.meeting.domain.port.repository.RoomRepository;
 import com.cmc.meeting.domain.port.repository.UserRepository; // Giả sử chúng ta có repo này
@@ -34,256 +36,283 @@ import jakarta.persistence.EntityNotFoundException; // Dùng tạm exception c�
 @Transactional // Đảm bảo mọi thứ là 1 giao dịch (Yêu cầu 3.2)
 public class MeetingServiceImpl implements MeetingService {
 
-    // ---- Phụ thuộc vào các "Ports" (Interface) từ Domain ----
-    // Chúng ta không phụ thuộc vào JPA hay MyBatiS
-    private final MeetingRepository meetingRepository;
-    private final RoomRepository roomRepository;
-    private final UserRepository userRepository; 
+        // ---- Phụ thuộc vào các "Ports" (Interface) từ Domain ----
+        // Chúng ta không phụ thuộc vào JPA hay MyBatiS
+        private final MeetingRepository meetingRepository;
+        private final RoomRepository roomRepository;
+        private final UserRepository userRepository;
 
-    private final ModelMapper modelMapper;
-    private final ApplicationEventPublisher eventPublisher; // Dùng để bắn event (Yêu cầu 4.1)
+        private final ModelMapper modelMapper;
+        private final ApplicationEventPublisher eventPublisher; // Dùng để bắn event (Yêu cầu 4.1)
+        private final DeviceRepository deviceRepository;
 
-    // Sử dụng Constructor Injection (Clean Code)
-    public MeetingServiceImpl(MeetingRepository meetingRepository,
-                            RoomRepository roomRepository,
-                            UserRepository userRepository,
-                            ModelMapper modelMapper,
-                            ApplicationEventPublisher eventPublisher) {
-        this.meetingRepository = meetingRepository;
-        this.roomRepository = roomRepository;
-        this.userRepository = userRepository;
-        this.modelMapper = modelMapper;
-        this.eventPublisher = eventPublisher;
-    }
-
-    /**
-     * Hiện thực hóa User Story 1: Tạo lịch họp
-     */
-    @Override
-    public MeetingDTO createMeeting(MeetingCreationRequest request, Long organizerId) {
-
-        // --- 1. Validate Nghiệp vụ (Business Rule Validation) ---
-
-        // (Chúng ta sẽ hiện thực logic này sau)
-        // if (meetingRepository.isRoomBusy(request.getRoomId(), request.getStartTime(), request.getEndTime())) {
-        //     throw new MeetingConflictException("Phòng đã bị đặt trong khung giờ này");
-        // }
-
-        // (Chúng ta cũng cần check lịch của người tham dự - US-5/BS-1.3)
-
-        // --- 2. Lấy các đối tượng Domain (POJO) ---
-
-        User organizer = userRepository.findById(organizerId)
-                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy người tổ chức"));
-
-        Room room = roomRepository.findById(request.getRoomId())
-                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy phòng họp"));
-
-        Set<User> participants = request.getParticipantIds().stream()
-                .map(id -> userRepository.findById(id)
-                        .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy người tham dự với ID: " + id)))
-                .collect(Collectors.toSet());
-
-        // --- 3. Tạo đối tượng Domain (Sử dụng logic trong model) ---
-        Meeting newMeeting = new Meeting(
-                request.getTitle(),
-                request.getStartTime(),
-                request.getEndTime(),
-                room,
-                organizer,
-                participants
-        );
-
-        // --- 4. Lưu vào Database (thông qua Port) ---
-        Meeting savedMeeting = meetingRepository.save(newMeeting);
-
-        // --- 5. Bắn sự kiện (Event-Driven) - Yêu cầu 4.1 ---
-        // Hệ thống sẽ gửi mail, đồng bộ calendar ở một luồng khác (@Async)
-        // API sẽ trả về ngay lập tức cho user.
-        eventPublisher.publishEvent(new MeetingCreatedEvent(savedMeeting.getId()));
-
-        // --- 6. Map sang DTO để trả về cho user ---
-        return modelMapper.map(savedMeeting, MeetingDTO.class);
-    }
-    @Override
-    public void cancelMeeting(Long meetingId, MeetingCancelRequest request, Long currentUserId) {
-        Meeting meeting = meetingRepository.findById(meetingId)
-                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy cuộc họp với ID: " + meetingId));
-
-        if (!meeting.getOrganizer().getId().equals(currentUserId)) {
-            throw new PolicyViolationException("Chỉ người tổ chức mới có quyền hủy cuộc họp này.");
+        // Sử dụng Constructor Injection (Clean Code)
+        public MeetingServiceImpl(MeetingRepository meetingRepository,
+                        RoomRepository roomRepository,
+                        UserRepository userRepository,
+                        ModelMapper modelMapper,
+                        ApplicationEventPublisher eventPublisher,
+                        DeviceRepository deviceRepository) {
+                this.meetingRepository = meetingRepository;
+                this.roomRepository = roomRepository;
+                this.userRepository = userRepository;
+                this.modelMapper = modelMapper;
+                this.eventPublisher = eventPublisher;
+                this.deviceRepository = deviceRepository;
         }
 
-        // Gọi logic DOMAIN (với 'reason')
-        meeting.cancelMeeting(request.getReason()); 
+        /**
+         * Hiện thực hóa User Story 1: Tạo lịch họp
+         */
+        @Override
+        public MeetingDTO createMeeting(MeetingCreationRequest request, Long organizerId) {
 
-        meetingRepository.save(meeting);
+                // --- 1. Validate Nghiệp vụ (Business Rule Validation) ---
 
-        // (Bonus: Bắn event MeetingCancelledEvent để gửi mail)
-    }
+                // (Chúng ta sẽ hiện thực logic này sau)
+                // if (meetingRepository.isRoomBusy(request.getRoomId(), request.getStartTime(),
+                // request.getEndTime())) {
+                // throw new MeetingConflictException("Phòng đã bị đặt trong khung giờ này");
+                // }
 
-    /**
-     * Hiện thực hóa: Lấy chi tiết 1 cuộc họp
-     */
-    @Override
-    @Transactional(readOnly = true)
-    public MeetingDTO getMeetingById(Long meetingId, Long currentUserId) {
-        Meeting meeting = meetingRepository.findById(meetingId)
-                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy cuộc họp với ID: " + meetingId));
+                // (Chúng ta cũng cần check lịch của người tham dự - US-5/BS-1.3)
 
-        boolean isOrganizer = meeting.getOrganizer().getId().equals(currentUserId);
-        
-        // SỬA DÒNG NÀY:
-        boolean isParticipant = meeting.getParticipants().stream()
-                .anyMatch(p -> p.getUser().getId().equals(currentUserId)); // Đổi "user" thành "p.getUser()"
+                // --- 2. Lấy các đối tượng Domain (POJO) ---
 
-        if (!isOrganizer && !isParticipant) {
-            throw new PolicyViolationException("Bạn không có quyền xem chi tiết cuộc họp này.");
+                User organizer = userRepository.findById(organizerId)
+                                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy người tổ chức"));
+
+                Room room = roomRepository.findById(request.getRoomId())
+                                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy phòng họp"));
+
+                Set<User> participants = request.getParticipantIds().stream()
+                                .map(id -> userRepository.findById(id)
+                                                .orElseThrow(() -> new EntityNotFoundException(
+                                                                "Không tìm thấy người tham dự với ID: " + id)))
+                                .collect(Collectors.toSet());
+                Set<Device> devices = request.getDeviceIds().stream()
+                                .map(id -> deviceRepository.findById(id)
+                                                .orElseThrow(() -> new EntityNotFoundException(
+                                                                "Không tìm thấy thiết bị với ID: " + id)))
+                                .collect(Collectors.toSet());
+
+                // --- 3. Tạo đối tượng Domain (Sử dụng logic trong model) ---
+                Meeting newMeeting = new Meeting(
+                                request.getTitle(),
+                                request.getStartTime(),
+                                request.getEndTime(),
+                                room,
+                                organizer,
+                                participants,
+                                devices);
+
+                // --- 4. Lưu vào Database (thông qua Port) ---
+                Meeting savedMeeting = meetingRepository.save(newMeeting);
+
+                // --- 5. Bắn sự kiện (Event-Driven) - Yêu cầu 4.1 ---
+                // Hệ thống sẽ gửi mail, đồng bộ calendar ở một luồng khác (@Async)
+                // API sẽ trả về ngay lập tức cho user.
+                eventPublisher.publishEvent(new MeetingCreatedEvent(savedMeeting.getId()));
+
+                // --- 6. Map sang DTO để trả về cho user ---
+                return modelMapper.map(savedMeeting, MeetingDTO.class);
         }
 
-        return modelMapper.map(meeting, MeetingDTO.class);
-    }
+        @Override
+        public void cancelMeeting(Long meetingId, MeetingCancelRequest request, Long currentUserId) {
+                Meeting meeting = meetingRepository.findById(meetingId)
+                                .orElseThrow(() -> new EntityNotFoundException(
+                                                "Không tìm thấy cuộc họp với ID: " + meetingId));
 
-    /**
-     * Hiện thực hóa User Story 6: Lấy danh sách cuộc họp của tôi
-     */
-    @Override
-    @Transactional(readOnly = true) // Nghiệp vụ chỉ đọc
-    public List<MeetingDTO> getMyMeetings(Long currentUserId) {
-        // 1. Gọi query phức tạp (đã được định nghĩa ở Repository)
-        List<Meeting> meetings = meetingRepository.findAllByUserId(currentUserId);
+                if (!meeting.getOrganizer().getId().equals(currentUserId)) {
+                        throw new PolicyViolationException("Chỉ người tổ chức mới có quyền hủy cuộc họp này.");
+                }
 
-        // 2. Map List<Meeting> sang List<MeetingDTO>
-        return meetings.stream()
-                .map(meeting -> modelMapper.map(meeting, MeetingDTO.class))
-                .collect(Collectors.toList());
-    }
-    /**
-     * Hiện thực hóa User Story 2: Chỉnh sửa lịch họp
-     */
-    @Override
-    public MeetingDTO updateMeeting(Long meetingId, MeetingUpdateRequest request, Long currentUserId) {
-        
-        Meeting meeting = meetingRepository.findById(meetingId)
-                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy cuộc họp với ID: " + meetingId));
+                // Gọi logic DOMAIN (với 'reason')
+                meeting.cancelMeeting(request.getReason());
 
-        // ... (Kiểm tra quyền, trạng thái, trùng lịch giữ nguyên) ...
-        
-        // 5. Lấy các đối tượng liên quan mới
-        Room newRoom = roomRepository.findById(request.getRoomId())
-                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy phòng họp"));
-                
-        // SỬA LOGIC NÀY:
-        // 5a. Lấy Set<User>
-        Set<User> newParticipantUsers = request.getParticipantIds().stream()
-                .map(id -> userRepository.findById(id)
-                        .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy người tham dự với ID: " + id)))
-                .collect(Collectors.toSet());
+                meetingRepository.save(meeting);
 
-        // 5b. Chuyển đổi sang Set<MeetingParticipant>
-        Set<MeetingParticipant> newParticipants = new HashSet<>();
-        User organizer = meeting.getOrganizer();
-        
-        // Add organizer
-        newParticipants.add(new MeetingParticipant(organizer, ParticipantStatus.ACCEPTED, null)); // null token
-
-        // Add những người khác
-        newParticipantUsers.forEach(user -> {
-            if (!user.getId().equals(organizer.getId())) {
-                newParticipants.add(
-                    new MeetingParticipant(user, ParticipantStatus.PENDING, UUID.randomUUID().toString()) // Tạo token mới
-                );
-            }
-        });
-        // KẾT THÚC SỬA LOGIC
-
-        // 6. Cập nhật các trường
-        meeting.setTitle(request.getTitle());
-        meeting.setDescription(request.getDescription());
-        meeting.setStartTime(request.getStartTime());
-        meeting.setEndTime(request.getEndTime());
-        meeting.setRoom(newRoom);
-        meeting.setParticipants(newParticipants); // <-- Dòng này giờ đã đúng
-
-        Meeting updatedMeeting = meetingRepository.save(meeting);
-        return modelMapper.map(updatedMeeting, MeetingDTO.class);
-    }
-    @Override
-    public void respondToInvitation(Long meetingId, MeetingResponseRequest request, Long currentUserId) {
-        
-        // 1. Kiểm tra trạng thái gửi lên
-        if (request.getStatus() == ParticipantStatus.PENDING) {
-            throw new IllegalArgumentException("Không thể đổi trạng thái về PENDING.");
+                // (Bonus: Bắn event MeetingCancelledEvent để gửi mail)
         }
 
-        // 2. Tìm cuộc họp
-        Meeting meeting = meetingRepository.findById(meetingId)
-                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy cuộc họp với ID: " + meetingId));
+        /**
+         * Hiện thực hóa: Lấy chi tiết 1 cuộc họp
+         */
+        @Override
+        @Transactional(readOnly = true)
+        public MeetingDTO getMeetingById(Long meetingId, Long currentUserId) {
+                Meeting meeting = meetingRepository.findById(meetingId)
+                                .orElseThrow(() -> new EntityNotFoundException(
+                                                "Không tìm thấy cuộc họp với ID: " + meetingId));
 
-        // 3. Lấy đối tượng User (người đang phản hồi)
-        User currentUser = userRepository.findById(currentUserId)
-                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy user"));
-        
-        // 4. Gọi logic DOMAIN (POJO)
-        // (POJO này chứa logic kiểm tra xem user có trong danh sách mời không)
-        meeting.respondToInvitation(currentUser, request.getStatus());
+                boolean isOrganizer = meeting.getOrganizer().getId().equals(currentUserId);
 
-        // 5. Lưu lại trạng thái mới
-        meetingRepository.save(meeting);
-        
-        // (Bonus: Bắn event MeetingRespondedEvent để thông báo cho organizer)
-    }
-    @Override
-    public String respondByLink(String token, ParticipantStatus status) {
-        if (status == ParticipantStatus.PENDING) {
-            return "Trạng thái không hợp lệ.";
+                // SỬA DÒNG NÀY:
+                boolean isParticipant = meeting.getParticipants().stream()
+                                .anyMatch(p -> p.getUser().getId().equals(currentUserId)); // Đổi "user" thành
+                                                                                           // "p.getUser()"
+
+                if (!isOrganizer && !isParticipant) {
+                        throw new PolicyViolationException("Bạn không có quyền xem chi tiết cuộc họp này.");
+                }
+
+                return modelMapper.map(meeting, MeetingDTO.class);
         }
 
-        // 1. Tìm cuộc họp bằng token
-        Meeting meeting = meetingRepository.findMeetingByParticipantToken(token)
-                .orElseThrow(() -> new EntityNotFoundException("Link phản hồi không hợp lệ hoặc đã hết hạn."));
+        /**
+         * Hiện thực hóa User Story 6: Lấy danh sách cuộc họp của tôi
+         */
+        @Override
+        @Transactional(readOnly = true) // Nghiệp vụ chỉ đọc
+        public List<MeetingDTO> getMyMeetings(Long currentUserId) {
+                // 1. Gọi query phức tạp (đã được định nghĩa ở Repository)
+                List<Meeting> meetings = meetingRepository.findAllByUserId(currentUserId);
 
-        // 2. Tìm chính xác participant có token đó
-        MeetingParticipant participant = meeting.getParticipants().stream()
-                .filter(p -> token.equals(p.getResponseToken()))
-                .findFirst()
-                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy người tham dự với token này."));
-
-        // 3. Cập nhật trạng thái
-        participant.setStatus(status);
-
-        // 4. (Quan trọng) Xóa token để link chỉ dùng 1 lần
-        participant.setResponseToken(null); 
-
-        meetingRepository.save(meeting);
-
-        if (status == ParticipantStatus.ACCEPTED) {
-            return "Cảm ơn! Phản hồi (Chấp nhận) của bạn đã được ghi lại.";
-        } else {
-            return "Phản hồi (Từ chối) của bạn đã được ghi lại.";
+                // 2. Map List<Meeting> sang List<MeetingDTO>
+                return meetings.stream()
+                                .map(meeting -> modelMapper.map(meeting, MeetingDTO.class))
+                                .collect(Collectors.toList());
         }
-    }
-    @Override
-    public String checkIn(CheckInRequest request, Long currentUserId) {
 
-        // 1. Tìm cuộc họp hợp lệ để check-in
-        // (Query này đã bao gồm: đúng người tổ chức, đúng phòng,
-        // đúng thời gian, chưa check-in, chưa hủy)
-        Meeting meeting = meetingRepository.findCheckInEligibleMeeting(
-                    currentUserId, 
-                    request.getRoomId(), 
-                    LocalDateTime.now()) // Thời gian hiện tại
-                .orElseThrow(() -> 
-                        new EntityNotFoundException(
-                            "Không tìm thấy cuộc họp hợp lệ để check-in tại phòng này cho bạn."
-                        ));
+        /**
+         * Hiện thực hóa User Story 2: Chỉnh sửa lịch họp
+         */
+        @Override
+        public MeetingDTO updateMeeting(Long meetingId, MeetingUpdateRequest request, Long currentUserId) {
 
-        // 2. Gọi logic DOMAIN (POJO)
-        meeting.checkIn(); // -> Đổi isCheckedIn = true
+                Meeting meeting = meetingRepository.findById(meetingId)
+                                .orElseThrow(() -> new EntityNotFoundException(
+                                                "Không tìm thấy cuộc họp với ID: " + meetingId));
 
-        // 3. Lưu lại
-        meetingRepository.save(meeting);
+                // ... (Kiểm tra quyền, trạng thái, trùng lịch giữ nguyên) ...
 
-        return String.format("Check-in thành công cho cuộc họp: %s", meeting.getTitle());
-    }
+                // 5. Lấy các đối tượng liên quan mới
+                Room newRoom = roomRepository.findById(request.getRoomId())
+                                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy phòng họp"));
+
+                // SỬA LOGIC NÀY:
+                // 5a. Lấy Set<User>
+                Set<User> newParticipantUsers = request.getParticipantIds().stream()
+                                .map(id -> userRepository.findById(id)
+                                                .orElseThrow(() -> new EntityNotFoundException(
+                                                                "Không tìm thấy người tham dự với ID: " + id)))
+                                .collect(Collectors.toSet());
+                Set<Device> newDevices = request.getDeviceIds().stream()
+                                .map(id -> deviceRepository.findById(id)
+                                                .orElseThrow(() -> new EntityNotFoundException(
+                                                                "Không tìm thấy thiết bị với ID: " + id)))
+                                .collect(Collectors.toSet());
+
+                // 5b. Chuyển đổi sang Set<MeetingParticipant>
+                Set<MeetingParticipant> newParticipants = new HashSet<>();
+                User organizer = meeting.getOrganizer();
+
+                // Add organizer
+                newParticipants.add(new MeetingParticipant(organizer, ParticipantStatus.ACCEPTED, null)); // null token
+
+                // Add những người khác
+                newParticipantUsers.forEach(user -> {
+                        if (!user.getId().equals(organizer.getId())) {
+                                newParticipants.add(
+                                                new MeetingParticipant(user, ParticipantStatus.PENDING,
+                                                                UUID.randomUUID().toString()) // Tạo token mới
+                                );
+                        }
+                });
+                // KẾT THÚC SỬA LOGIC
+
+                // 6. Cập nhật các trường
+                meeting.setTitle(request.getTitle());
+                meeting.setDescription(request.getDescription());
+                meeting.setStartTime(request.getStartTime());
+                meeting.setEndTime(request.getEndTime());
+                meeting.setRoom(newRoom);
+                meeting.setParticipants(newParticipants); // <-- Dòng này giờ đã đúng
+                meeting.setDevices(newDevices);
+                Meeting updatedMeeting = meetingRepository.save(meeting);
+                return modelMapper.map(updatedMeeting, MeetingDTO.class);
+        }
+
+        @Override
+        public void respondToInvitation(Long meetingId, MeetingResponseRequest request, Long currentUserId) {
+
+                // 1. Kiểm tra trạng thái gửi lên
+                if (request.getStatus() == ParticipantStatus.PENDING) {
+                        throw new IllegalArgumentException("Không thể đổi trạng thái về PENDING.");
+                }
+
+                // 2. Tìm cuộc họp
+                Meeting meeting = meetingRepository.findById(meetingId)
+                                .orElseThrow(() -> new EntityNotFoundException(
+                                                "Không tìm thấy cuộc họp với ID: " + meetingId));
+
+                // 3. Lấy đối tượng User (người đang phản hồi)
+                User currentUser = userRepository.findById(currentUserId)
+                                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy user"));
+
+                // 4. Gọi logic DOMAIN (POJO)
+                // (POJO này chứa logic kiểm tra xem user có trong danh sách mời không)
+                meeting.respondToInvitation(currentUser, request.getStatus());
+
+                // 5. Lưu lại trạng thái mới
+                meetingRepository.save(meeting);
+
+                // (Bonus: Bắn event MeetingRespondedEvent để thông báo cho organizer)
+        }
+
+        @Override
+        public String respondByLink(String token, ParticipantStatus status) {
+                if (status == ParticipantStatus.PENDING) {
+                        return "Trạng thái không hợp lệ.";
+                }
+
+                // 1. Tìm cuộc họp bằng token
+                Meeting meeting = meetingRepository.findMeetingByParticipantToken(token)
+                                .orElseThrow(() -> new EntityNotFoundException(
+                                                "Link phản hồi không hợp lệ hoặc đã hết hạn."));
+
+                // 2. Tìm chính xác participant có token đó
+                MeetingParticipant participant = meeting.getParticipants().stream()
+                                .filter(p -> token.equals(p.getResponseToken()))
+                                .findFirst()
+                                .orElseThrow(() -> new EntityNotFoundException(
+                                                "Không tìm thấy người tham dự với token này."));
+
+                // 3. Cập nhật trạng thái
+                participant.setStatus(status);
+
+                // 4. (Quan trọng) Xóa token để link chỉ dùng 1 lần
+                participant.setResponseToken(null);
+
+                meetingRepository.save(meeting);
+
+                if (status == ParticipantStatus.ACCEPTED) {
+                        return "Cảm ơn! Phản hồi (Chấp nhận) của bạn đã được ghi lại.";
+                } else {
+                        return "Phản hồi (Từ chối) của bạn đã được ghi lại.";
+                }
+        }
+
+        @Override
+        public String checkIn(CheckInRequest request, Long currentUserId) {
+
+                // 1. Tìm cuộc họp hợp lệ để check-in
+                // (Query này đã bao gồm: đúng người tổ chức, đúng phòng,
+                // đúng thời gian, chưa check-in, chưa hủy)
+                Meeting meeting = meetingRepository.findCheckInEligibleMeeting(
+                                currentUserId,
+                                request.getRoomId(),
+                                LocalDateTime.now()) // Thời gian hiện tại
+                                .orElseThrow(() -> new EntityNotFoundException(
+                                                "Không tìm thấy cuộc họp hợp lệ để check-in tại phòng này cho bạn."));
+
+                // 2. Gọi logic DOMAIN (POJO)
+                meeting.checkIn(); // -> Đổi isCheckedIn = true
+
+                // 3. Lưu lại
+                meetingRepository.save(meeting);
+
+                return String.format("Check-in thành công cho cuộc họp: %s", meeting.getTitle());
+        }
 }

@@ -33,4 +33,5 @@ public class MeetingUpdateRequest {
     @NotNull
     @Size(min = 1)
     private Set<Long> participantIds;
+    private Set<Long> deviceIds;
 }

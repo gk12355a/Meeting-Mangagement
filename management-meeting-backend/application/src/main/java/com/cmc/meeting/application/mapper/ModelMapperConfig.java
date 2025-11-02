@@ -14,19 +14,16 @@ import org.springframework.context.annotation.Configuration;
 public class ModelMapperConfig {
 
     // BỎ: UserRepository injection
-
-    @Bean
-    public ModelMapper modelMapper() { // BỎ: Tham số UserRepository
+@Bean
+    public ModelMapper modelMapper() { 
         ModelMapper modelMapper = new ModelMapper();
         modelMapper.getConfiguration()
                 .setMatchingStrategy(MatchingStrategies.STRICT);
-        
-        // --- BỎ QUY TẮC 1, 2, 4, 5 (vì chúng liên quan đến 'infrastructure') ---
 
-        // --- GIỮ LẠI QUY TẮC 3 (Domain -> DTO) ---
-        // Đây là nhiệm vụ của 'application'
+        // --- GIỮ LẠI LOGIC NÀY (Domain -> DTO) ---
         modelMapper.createTypeMap(MeetingParticipant.class, MeetingDTO.UserDTO.class)
             .setConverter(context -> {
+                // ... (code map Participant -> UserDTO giữ nguyên)
                 if (context.getSource() == null || context.getSource().getUser() == null) {
                     return null;
                 }
@@ -36,6 +33,8 @@ public class ModelMapperConfig {
                 userDTO.setFullName(user.getFullName());
                 return userDTO;
             });
+
+        // --- XÓA CÁC QUY TẮC MAP DeviceEntity/Device TẠI ĐÂY ---
 
         return modelMapper;
     }

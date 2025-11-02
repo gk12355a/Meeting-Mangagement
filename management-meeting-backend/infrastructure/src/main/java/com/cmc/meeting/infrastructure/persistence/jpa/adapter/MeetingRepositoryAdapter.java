@@ -1,15 +1,22 @@
 package com.cmc.meeting.infrastructure.persistence.jpa.adapter;
 
+import com.cmc.meeting.domain.model.Device;
 import com.cmc.meeting.domain.model.Meeting;
 import com.cmc.meeting.domain.model.MeetingParticipant; // Bổ sung
 import com.cmc.meeting.domain.model.User; // Bổ sung
 import com.cmc.meeting.domain.port.repository.MeetingRepository;
 import com.cmc.meeting.domain.port.repository.UserRepository; // Bổ sung
+import com.cmc.meeting.infrastructure.persistence.jpa.entity.DeviceEntity;
 import com.cmc.meeting.infrastructure.persistence.jpa.entity.MeetingEntity;
 import com.cmc.meeting.infrastructure.persistence.jpa.embeddable.EmbeddableParticipant; // Bổ sung
 import com.cmc.meeting.infrastructure.persistence.jpa.repository.SpringDataMeetingRepository;
+import com.cmc.meeting.domain.model.Device;
+import com.cmc.meeting.infrastructure.persistence.jpa.entity.DeviceEntity;
+import jakarta.annotation.PostConstruct;
+
 // Bỏ: @PostConstruct
 import org.modelmapper.ModelMapper;
+import org.modelmapper.TypeMap;
 // Bỏ: TypeMap
 import org.springframework.stereotype.Repository;
 
@@ -159,5 +166,18 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
         return jpaRepository.findCanceledMeetingsInDateRange(from, to).stream()
                 .map(this::toDomain) // Dùng lại helper toDomain
                 .collect(Collectors.toList());
+    }
+    @PostConstruct
+    public void configureMapper() {
+        // Cấu hình (cũ) cho Meeting <-> MeetingEntity
+        TypeMap<MeetingEntity, Meeting> entityToDomainMap = modelMapper.typeMap(MeetingEntity.class, Meeting.class);
+        entityToDomainMap.addMappings(mapper -> mapper.skip(Meeting::setParticipants));
+            
+        TypeMap<Meeting, MeetingEntity> domainToEntityMap = modelMapper.typeMap(Meeting.class, MeetingEntity.class);
+        domainToEntityMap.addMappings(mapper -> mapper.skip(MeetingEntity::setParticipants));
+        
+        // --- BỔ SUNG: Dạy cách map Device (Vì tên trường giống hệt nhau) ---
+        modelMapper.createTypeMap(DeviceEntity.class, Device.class);
+        modelMapper.createTypeMap(Device.class, DeviceEntity.class);
     }
 }

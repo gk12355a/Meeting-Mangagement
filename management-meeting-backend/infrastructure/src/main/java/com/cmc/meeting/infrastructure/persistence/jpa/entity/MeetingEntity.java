@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.Set;
 
 @Data
@@ -56,4 +57,13 @@ public class MeetingEntity {
     
     @Column
     private LocalDateTime cancelledAt;
+
+    // BỔ SUNG: (US-12)
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "meeting_devices", // Tên bảng trung gian
+        joinColumns = @JoinColumn(name = "meeting_id"),
+        inverseJoinColumns = @JoinColumn(name = "device_id")
+    )
+    private Set<DeviceEntity> devices = new HashSet<>();
 }
