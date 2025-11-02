@@ -1,6 +1,7 @@
 package com.cmc.meeting.application.service;
 
 import com.cmc.meeting.application.dto.meeting.CheckInRequest;
+import com.cmc.meeting.application.dto.meeting.MeetingCancelRequest;
 import com.cmc.meeting.application.dto.meeting.MeetingResponseRequest;
 import com.cmc.meeting.application.dto.request.MeetingCreationRequest;
 import com.cmc.meeting.application.dto.request.MeetingUpdateRequest;
@@ -105,27 +106,20 @@ public class MeetingServiceImpl implements MeetingService {
         return modelMapper.map(savedMeeting, MeetingDTO.class);
     }
     @Override
-    public void cancelMeeting(Long meetingId, Long currentUserId) {
-        // 1. Tìm cuộc họp trong CSDL
+    public void cancelMeeting(Long meetingId, MeetingCancelRequest request, Long currentUserId) {
         Meeting meeting = meetingRepository.findById(meetingId)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy cuộc họp với ID: " + meetingId));
 
-        // 2. KIỂM TRA QUYỀN (Business Rule): 
-        // Chỉ người tổ chức (organizer) mới được hủy
         if (!meeting.getOrganizer().getId().equals(currentUserId)) {
-            // Ném lỗi nghiệp vụ (chúng ta sẽ tạo Exception này)
             throw new PolicyViolationException("Chỉ người tổ chức mới có quyền hủy cuộc họp này.");
         }
 
-        // 3. Gọi logic DOMAIN (POJO)
-        // (POJO này chứa logic: không được hủy họp đã qua, không được hủy 2 lần)
-        meeting.cancelMeeting(); // -> Đổi status thành CANCELLED
+        // Gọi logic DOMAIN (với 'reason')
+        meeting.cancelMeeting(request.getReason()); 
 
-        // 4. Lưu lại trạng thái mới vào CSDL
         meetingRepository.save(meeting);
-        
-        // (Bonus: Chúng ta có thể bắn 1 event MeetingCancelledEvent
-        // để gửi email thông báo cho người tham dự ở đây)
+
+        // (Bonus: Bắn event MeetingCancelledEvent để gửi mail)
     }
 
     /**

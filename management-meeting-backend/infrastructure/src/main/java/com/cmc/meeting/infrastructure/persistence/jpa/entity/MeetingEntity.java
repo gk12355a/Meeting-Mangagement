@@ -50,4 +50,10 @@ public class MeetingEntity {
 
     @Column(nullable = false, columnDefinition = "BIT(1) DEFAULT 0")
     private boolean isCheckedIn = false;
+
+    @Column
+    private String cancelReason;
+    
+    @Column
+    private LocalDateTime cancelledAt;
 }

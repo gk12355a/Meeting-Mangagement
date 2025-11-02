@@ -25,6 +25,8 @@ public class Meeting {
     private Set<MeetingParticipant> participants = new HashSet<>(); // Người tham dự
     private BookingStatus status;
     private boolean isCheckedIn = false;
+    private String cancelReason;
+    private LocalDateTime cancelledAt;
 
     // Constructor cho nghiệp vụ tạo mới
     public Meeting(String title, LocalDateTime startTime, LocalDateTime endTime,
@@ -66,16 +68,20 @@ public class Meeting {
     /**
      * Nghiệp vụ Hủy cuộc họp (US-2)
      */
-    public void cancelMeeting() {
+    public void cancelMeeting(String reason) { // <-- Thêm 'reason'
         if (this.status == BookingStatus.CANCELLED) {
-            // Không thể hủy một cuộc họp đã bị hủy
-            throw new IllegalStateException("Meeting is already cancelled.");
+            throw new IllegalStateException("Cuộc họp đã bị hủy.");
         }
         if (this.startTime.isBefore(LocalDateTime.now())) {
-            // Không thể hủy một cuộc họp đã diễn ra
-            throw new IllegalStateException("Cannot cancel a meeting that has already passed.");
+            throw new IllegalStateException("Không thể hủy cuộc họp đã diễn ra.");
         }
+        if (reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("Lý do hủy là bắt buộc.");
+        }
+
         this.status = BookingStatus.CANCELLED;
+        this.cancelReason = reason;
+        this.cancelledAt = LocalDateTime.now();
     }
 
     /**

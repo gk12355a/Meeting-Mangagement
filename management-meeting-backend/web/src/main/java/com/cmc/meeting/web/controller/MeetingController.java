@@ -1,6 +1,7 @@
 package com.cmc.meeting.web.controller;
 
 import com.cmc.meeting.application.dto.meeting.CheckInRequest;
+import com.cmc.meeting.application.dto.meeting.MeetingCancelRequest;
 import com.cmc.meeting.application.dto.meeting.MeetingResponseRequest;
 import com.cmc.meeting.application.dto.request.MeetingCreationRequest;
 import com.cmc.meeting.application.dto.request.MeetingUpdateRequest;
@@ -62,23 +63,20 @@ public class MeetingController {
                 return new ResponseEntity<>(createdMeeting, HttpStatus.CREATED); // 201
         }
 
-        @DeleteMapping("/{id}") // Dùng phương thức DELETE
-        @Operation(summary = "Hủy một lịch họp (chỉ người tổ chức)")
+        @DeleteMapping("/{id}")
+        @Operation(summary = "Hủy một lịch họp (chỉ người tổ chức) - Bắt buộc lý do")
         public ResponseEntity<?> cancelMeeting(
-                        @PathVariable Long id, // Lấy ID từ URL (vd: /api/v1/meetings/1)
+                        @PathVariable Long id,
+                        @Valid @RequestBody MeetingCancelRequest request, // <-- THÊM
                         @AuthenticationPrincipal UserDetails userDetails) {
 
-                // 1. Lấy username từ token
-                String username = userDetails.getUsername();
-
-                // 2. Lấy ID user
-                com.cmc.meeting.domain.model.User currentUser = userRepository.findByUsername(username)
+                com.cmc.meeting.domain.model.User currentUser = userRepository.findByUsername(userDetails.getUsername())
                                 .orElseThrow(() -> new RuntimeException("Lỗi: Không tìm thấy user từ token"));
 
-                // 3. Gọi service
-                meetingService.cancelMeeting(id, currentUser.getId());
+                // Gọi service (đã cập nhật)
+                meetingService.cancelMeeting(id, request, currentUser.getId());
 
-                return ResponseEntity.ok("Đã hủy cuộc họp thành công."); // 200 OK
+                return ResponseEntity.ok("Đã hủy cuộc họp thành công.");
         }
 
         /**

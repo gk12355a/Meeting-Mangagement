@@ -49,17 +49,16 @@ public class ScheduledTaskService {
         // 3. Hủy các cuộc họp đó
         log.warn("SCHEDULER: Tìm thấy {} cuộc họp ma. Đang tiến hành hủy:", ghostMeetings.size());
         
+        final String reason = "Tự động hủy do không check-in sau 15 phút."; // Define reason
+
         for (Meeting meeting : ghostMeetings) {
             log.warn("-> Hủy Meeting ID: {} (Chủ đề: {}) vì không check-in.", 
                      meeting.getId(), meeting.getTitle());
             
-            // Dùng logic domain (đã viết ở US-2)
-            meeting.cancelMeeting(); 
+            // Call the method WITH the reason
+            meeting.cancelMeeting(reason); 
             
-            // Lưu lại trạng thái CANCELLED
             meetingRepository.save(meeting);
-            
-            // (Bonus: Bắn event MeetingCancelledBySystemEvent để gửi mail)
         }
         
         log.info("SCHEDULER: Đã hoàn thành tác vụ.");
