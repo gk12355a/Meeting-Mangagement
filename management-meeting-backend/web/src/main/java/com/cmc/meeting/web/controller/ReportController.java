@@ -69,12 +69,32 @@ public class ReportController {
     }
     // BỔ SUNG: (US-23)
     @GetMapping("/cancelation-stats")
-    @Operation(summary = "Thống kê lý do hủy họp (US-23)")
-    public ResponseEntity<List<CancelationReportDTO>> getCancelationStats(
+    @Operation(summary = "Thống kê lý do hủy họp (US-23). Thêm ?format=excel để tải về.")
+    public ResponseEntity<?> getCancelationStats(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String format) { // <-- Thêm param "format"
 
+        // 1. Lấy dữ liệu (như cũ)
         List<CancelationReportDTO> report = reportService.getCancelationReport(from, to);
-        return ResponseEntity.ok(report);
+
+        // 2. Kiểm tra xem có muốn xuất Excel không
+        if ("excel".equalsIgnoreCase(format)) {
+
+            // 3. Gọi Service Excel
+            ByteArrayInputStream excelFile = excelExportService.exportCancelationReport(report);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.add("Content-Disposition", "attachment; filename=BaoCaoHuyHop.xlsx");
+
+            return ResponseEntity
+                    .ok()
+                    .headers(headers)
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .body(new InputStreamResource(excelFile));
+        } else {
+            // 4. Trả về JSON (như cũ)
+            return ResponseEntity.ok(report);
+        }
     }
 }

@@ -1,6 +1,7 @@
 // 1. SỬA LẠI PACKAGE
 package com.cmc.meeting.infrastructure.excel;
 
+import com.cmc.meeting.application.dto.report.CancelationReportDTO;
 // 2. BỔ SUNG CÁC IMPORT
 import com.cmc.meeting.application.dto.report.RoomUsageReportDTO;
 import com.cmc.meeting.application.port.service.ExcelExportService;
@@ -48,6 +49,36 @@ public class ExcelExportServiceImpl implements ExcelExportService { // Implement
             workbook.write(out);
             return new ByteArrayInputStream(out.toByteArray());
             
+        } catch (IOException e) {
+            throw new RuntimeException("Lỗi khi tạo file Excel: " + e.getMessage());
+        }
+    }
+    @Override
+    public ByteArrayInputStream exportCancelationReport(List<CancelationReportDTO> reportData) {
+
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream();) {
+
+            Sheet sheet = workbook.createSheet("BaoCaoHuyHop");
+
+            // Tạo hàng tiêu đề (Header)
+            Row headerRow = sheet.createRow(0);
+            String[] headers = {"Lý Do Hủy", "Số Lượt"};
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+            }
+
+            // Đổ dữ liệu
+            int rowIdx = 1;
+            for (CancelationReportDTO report : reportData) {
+                Row row = sheet.createRow(rowIdx++);
+                row.createCell(0).setCellValue(report.getReason());
+                row.createCell(1).setCellValue(report.getCount());
+            }
+
+            workbook.write(out);
+            return new ByteArrayInputStream(out.toByteArray());
+
         } catch (IOException e) {
             throw new RuntimeException("Lỗi khi tạo file Excel: " + e.getMessage());
         }
