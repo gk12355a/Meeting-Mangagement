@@ -7,11 +7,14 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize; // Quan trọng
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -73,5 +76,20 @@ public class RoomController {
     public ResponseEntity<?> deleteRoom(@PathVariable Long id) {
         roomService.deleteRoom(id);
         return ResponseEntity.ok("Đã xóa phòng họp thành công.");
+    }
+    /**
+     * API Gợi ý phòng họp (US-26)
+     * Lấy danh sách phòng trống theo thời gian và sức chứa
+     */
+    @GetMapping("/available")
+    @Operation(summary = "Gợi ý phòng họp (theo thời gian & sức chứa)")
+    @PreAuthorize("isAuthenticated()") // Chỉ cần đăng nhập
+    public ResponseEntity<List<RoomDTO>> getAvailableRooms(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime,
+            @RequestParam int capacity) {
+
+        List<RoomDTO> rooms = roomService.findAvailableRooms(startTime, endTime, capacity);
+        return ResponseEntity.ok(rooms);
     }
 }

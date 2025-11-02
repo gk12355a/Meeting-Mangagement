@@ -7,6 +7,7 @@ import com.cmc.meeting.infrastructure.persistence.jpa.repository.SpringDataRoomR
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -46,5 +47,12 @@ public class RoomRepositoryAdapter implements RoomRepository {
     @Override
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);
+    }
+    // BỔ SUNG: (US-26)
+    @Override
+    public List<Room> findAvailableRooms(LocalDateTime startTime, LocalDateTime endTime, int capacity) {
+        return jpaRepository.findAvailableRooms(startTime, endTime, capacity).stream()
+                .map(entity -> modelMapper.map(entity, Room.class)) // Dùng ModelMapper
+                .collect(Collectors.toList());
     }
 }

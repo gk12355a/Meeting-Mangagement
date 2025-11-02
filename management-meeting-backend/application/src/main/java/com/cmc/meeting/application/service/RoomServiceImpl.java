@@ -10,6 +10,7 @@ import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -63,5 +64,17 @@ public class RoomServiceImpl implements RoomService {
         // (Chúng ta nên check xem phòng có đang được đặt không trước khi xóa,
         // nhưng tạm thời cứ xóa)
         roomRepository.deleteById(id);
+    }
+    // BỔ SUNG: (US-26)
+    @Override
+    @Transactional(readOnly = true)
+    public List<RoomDTO> findAvailableRooms(LocalDateTime startTime, LocalDateTime endTime, int capacity) {
+        // 1. Gọi query phức tạp
+        List<Room> availableRooms = roomRepository.findAvailableRooms(startTime, endTime, capacity);
+
+        // 2. Map sang DTO
+        return availableRooms.stream()
+                .map(room -> modelMapper.map(room, RoomDTO.class))
+                .collect(Collectors.toList());
     }
 }
