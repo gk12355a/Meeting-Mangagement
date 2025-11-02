@@ -8,6 +8,7 @@ import com.cmc.meeting.application.dto.request.MeetingCreationRequest;
 import com.cmc.meeting.application.dto.request.MeetingUpdateRequest;
 import com.cmc.meeting.application.dto.response.MeetingDTO;
 import com.cmc.meeting.application.dto.timeslot.TimeSlotDTO;
+import com.cmc.meeting.domain.model.BookingStatus;
 import com.cmc.meeting.domain.model.Device;
 import com.cmc.meeting.domain.model.Meeting;
 import com.cmc.meeting.domain.model.MeetingParticipant;
@@ -34,7 +35,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import jakarta.persistence.EntityNotFoundException; // Dùng tạm exception của JPA
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.UUID; // Bổ sung
 
 @Service
@@ -50,6 +52,7 @@ public class MeetingServiceImpl implements MeetingService {
         private final ModelMapper modelMapper;
         private final ApplicationEventPublisher eventPublisher; // Dùng để bắn event (Yêu cầu 4.1)
         private final DeviceRepository deviceRepository;
+        private static final Logger log = LoggerFactory.getLogger(MeetingServiceImpl.class);
 
         // Sử dụng Constructor Injection (Clean Code)
         public MeetingServiceImpl(MeetingRepository meetingRepository,
@@ -410,5 +413,37 @@ public class MeetingServiceImpl implements MeetingService {
                 meetingRepository.save(meeting);
 
                 return String.format("Check-in thành công cho cuộc họp: %s", meeting.getTitle());
+        }
+
+        @Override
+        public void cancelMeetingSeries(String seriesId, MeetingCancelRequest request, Long currentUserId) {
+
+                // 1. Lấy tất cả các cuộc họp trong chuỗi
+                List<Meeting> meetingsInSeries = meetingRepository.findAllBySeriesId(seriesId);
+
+                if (meetingsInSeries.isEmpty()) {
+                        throw new EntityNotFoundException("Không tìm thấy chuỗi cuộc họp.");
+                }
+
+                // 2. KIỂM TRA QUYỀN (chỉ cần check cuộc họp đầu tiên)
+                Meeting firstMeeting = meetingsInSeries.get(0);
+                if (!firstMeeting.getOrganizer().getId().equals(currentUserId)) {
+                        throw new PolicyViolationException("Chỉ người tổ chức mới có quyền hủy chuỗi họp này.");
+                }
+
+                // 3. Hủy tất cả các cuộc họp CHƯA DIỄN RA
+                log.info("Hủy chuỗi {}: Tìm thấy {} cuộc họp.", seriesId, meetingsInSeries.size());
+
+                for (Meeting meeting : meetingsInSeries) {
+                        // Chỉ hủy nếu nó chưa diễn ra VÀ chưa bị hủy
+                        if (meeting.getStartTime().isAfter(LocalDateTime.now()) &&
+                                        meeting.getStatus() == BookingStatus.CONFIRMED) {
+
+                                log.info("-> Đang hủy Meeting ID: {}", meeting.getId());
+                                meeting.cancelMeeting(request.getReason());
+                                meetingRepository.save(meeting);
+                                // (Bonus: Bắn event)
+                        }
+                }
         }
 }

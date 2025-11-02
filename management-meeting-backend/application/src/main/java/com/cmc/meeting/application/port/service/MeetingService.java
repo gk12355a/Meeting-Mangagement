@@ -26,4 +26,5 @@ public interface MeetingService {
     void respondToInvitation(Long meetingId, MeetingResponseRequest request, Long currentUserId);
     String respondByLink(String token, ParticipantStatus status);
     String checkIn(CheckInRequest request, Long currentUserId);
+    void cancelMeetingSeries(String seriesId, MeetingCancelRequest request, Long currentUserId);
 }

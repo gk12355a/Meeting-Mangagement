@@ -178,4 +178,10 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
         modelMapper.createTypeMap(DeviceEntity.class, Device.class);
         modelMapper.createTypeMap(Device.class, DeviceEntity.class);
     }
+    @Override
+    public List<Meeting> findAllBySeriesId(String seriesId) {
+        return jpaRepository.findAllBySeriesId(seriesId).stream()
+                .map(this::toDomain) // Dùng lại helper toDomain
+                .collect(Collectors.toList());
+    }
 }

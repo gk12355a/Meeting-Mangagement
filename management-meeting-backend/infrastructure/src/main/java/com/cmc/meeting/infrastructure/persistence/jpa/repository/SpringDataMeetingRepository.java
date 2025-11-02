@@ -76,4 +76,5 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
     List<MeetingEntity> findCanceledMeetingsInDateRange(
             @Param("from") LocalDateTime from, 
             @Param("to") LocalDateTime to);
+    List<MeetingEntity> findAllBySeriesId(String seriesId);
 }

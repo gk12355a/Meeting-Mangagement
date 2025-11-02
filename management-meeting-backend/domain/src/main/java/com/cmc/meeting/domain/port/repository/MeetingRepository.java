@@ -25,4 +25,5 @@ public interface MeetingRepository {
     List<Meeting> findUncheckedInMeetings(LocalDateTime cutoffTime);
     List<Meeting> findMeetingsForUsersInDateRange(Set<Long> userIds, LocalDateTime from, LocalDateTime to);
     List<Meeting> findCanceledMeetingsInDateRange(LocalDateTime from, LocalDateTime to);
+    List<Meeting> findAllBySeriesId(String seriesId);
 }

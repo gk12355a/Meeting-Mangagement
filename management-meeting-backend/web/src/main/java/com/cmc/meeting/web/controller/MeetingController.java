@@ -217,4 +217,22 @@ public class MeetingController {
                 List<TimeSlotDTO> suggestions = timeSuggestionService.suggestTime(request);
                 return ResponseEntity.ok(suggestions);
         }
+
+        /**
+         * API Hủy toàn bộ chuỗi lịch định kỳ (US-3)
+         */
+        @DeleteMapping("/series/{seriesId}")
+        @Operation(summary = "Hủy toàn bộ chuỗi lịch định kỳ (chỉ người tổ chức)")
+        public ResponseEntity<?> cancelMeetingSeries(
+                        @PathVariable String seriesId, // Lấy ID chuỗi từ URL
+                        @Valid @RequestBody MeetingCancelRequest request,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                com.cmc.meeting.domain.model.User currentUser = userRepository.findByUsername(userDetails.getUsername())
+                                .orElseThrow(() -> new RuntimeException("Lỗi: Không tìm thấy user từ token"));
+
+                meetingService.cancelMeetingSeries(seriesId, request, currentUser.getId());
+
+                return ResponseEntity.ok("Đã hủy các cuộc họp (chưa diễn ra) trong chuỗi thành công.");
+        }
 }
