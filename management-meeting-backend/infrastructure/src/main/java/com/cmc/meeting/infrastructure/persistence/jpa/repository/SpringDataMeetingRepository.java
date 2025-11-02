@@ -37,4 +37,17 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
             @Param("to") LocalDateTime to);
     @Query("SELECT m FROM MeetingEntity m JOIN m.participants p WHERE p.responseToken = :token")
     Optional<MeetingEntity> findMeetingByParticipantToken(@Param("token") String token);
+    @Query("SELECT m FROM MeetingEntity m " +
+           "WHERE m.organizer.id = :organizerId " +
+           "AND m.room.id = :roomId " +
+           "AND m.status = 'CONFIRMED' " +
+           "AND m.isCheckedIn = false " +
+           // Điều kiện thời gian: 
+           // (Từ 15 phút trước giờ họp ĐẾN 30 phút sau giờ họp)
+           "AND m.startTime BETWEEN :timeStartWindow AND :timeEndWindow")
+    Optional<MeetingEntity> findCheckInEligibleMeeting(
+            @Param("organizerId") Long organizerId, 
+            @Param("roomId") Long roomId,
+            @Param("timeStartWindow") LocalDateTime timeStartWindow, // vd: now - 15 phút
+            @Param("timeEndWindow") LocalDateTime timeEndWindow); // vd: now + 30 phút
 }

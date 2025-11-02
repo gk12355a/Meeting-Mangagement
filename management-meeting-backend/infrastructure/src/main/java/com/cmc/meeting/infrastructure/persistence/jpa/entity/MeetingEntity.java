@@ -47,4 +47,7 @@ public class MeetingEntity {
     @ElementCollection(fetch = FetchType.EAGER) // Lấy danh sách participant ngay
     @CollectionTable(name = "meeting_participants", joinColumns = @JoinColumn(name = "meeting_id"))
     private Set<EmbeddableParticipant> participants;
+
+    @Column(nullable = false, columnDefinition = "BIT(1) DEFAULT 0")
+    private boolean isCheckedIn = false;
 }

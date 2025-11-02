@@ -127,4 +127,17 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
         return jpaRepository.findMeetingByParticipantToken(token)
                 .map(this::toDomain); // Dùng lại helper toDomain
     }
+    @Override
+    public Optional<Meeting> findCheckInEligibleMeeting(Long organizerId, Long roomId, LocalDateTime now) {
+        // Định nghĩa cửa sổ check-in (vd: 15 phút trước, 30 phút sau)
+        LocalDateTime timeStartWindow = now.minusMinutes(15);
+        LocalDateTime timeEndWindow = now.plusMinutes(30);
+
+        return jpaRepository.findCheckInEligibleMeeting(
+                    organizerId, 
+                    roomId, 
+                    timeStartWindow, 
+                    timeEndWindow)
+                .map(this::toDomain); // Dùng lại helper toDomain
+    }
 }

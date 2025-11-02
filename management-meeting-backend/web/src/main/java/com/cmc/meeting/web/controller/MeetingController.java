@@ -1,5 +1,6 @@
 package com.cmc.meeting.web.controller;
 
+import com.cmc.meeting.application.dto.meeting.CheckInRequest;
 import com.cmc.meeting.application.dto.meeting.MeetingResponseRequest;
 import com.cmc.meeting.application.dto.request.MeetingCreationRequest;
 import com.cmc.meeting.application.dto.request.MeetingUpdateRequest;
@@ -173,5 +174,20 @@ public class MeetingController {
             );
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(htmlError);
         }
+    }
+    @PostMapping("/check-in")
+    @Operation(summary = "Check-in vào một cuộc họp (chỉ người tổ chức)")
+    public ResponseEntity<?> checkInToMeeting(
+            @Valid @RequestBody CheckInRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        // 1. Lấy ID user từ token
+        com.cmc.meeting.domain.model.User currentUser = userRepository.findByUsername(userDetails.getUsername())
+                .orElseThrow(() -> new RuntimeException("Lỗi: Không tìm thấy user từ token"));
+
+        // 2. Gọi service
+        String message = meetingService.checkIn(request, currentUser.getId());
+
+        return ResponseEntity.ok(message); // 200 OK
     }
 }

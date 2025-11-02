@@ -1,5 +1,6 @@
 package com.cmc.meeting.application.service;
 
+import com.cmc.meeting.application.dto.meeting.CheckInRequest;
 import com.cmc.meeting.application.dto.meeting.MeetingResponseRequest;
 import com.cmc.meeting.application.dto.request.MeetingCreationRequest;
 import com.cmc.meeting.application.dto.request.MeetingUpdateRequest;
@@ -21,6 +22,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import com.cmc.meeting.domain.event.MeetingCreatedEvent; // (Chúng ta sẽ tạo file này)
 import com.cmc.meeting.application.port.service.MeetingService;
 import java.util.UUID;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -266,5 +268,28 @@ public class MeetingServiceImpl implements MeetingService {
         } else {
             return "Phản hồi (Từ chối) của bạn đã được ghi lại.";
         }
+    }
+    @Override
+    public String checkIn(CheckInRequest request, Long currentUserId) {
+
+        // 1. Tìm cuộc họp hợp lệ để check-in
+        // (Query này đã bao gồm: đúng người tổ chức, đúng phòng,
+        // đúng thời gian, chưa check-in, chưa hủy)
+        Meeting meeting = meetingRepository.findCheckInEligibleMeeting(
+                    currentUserId, 
+                    request.getRoomId(), 
+                    LocalDateTime.now()) // Thời gian hiện tại
+                .orElseThrow(() -> 
+                        new EntityNotFoundException(
+                            "Không tìm thấy cuộc họp hợp lệ để check-in tại phòng này cho bạn."
+                        ));
+
+        // 2. Gọi logic DOMAIN (POJO)
+        meeting.checkIn(); // -> Đổi isCheckedIn = true
+
+        // 3. Lưu lại
+        meetingRepository.save(meeting);
+
+        return String.format("Check-in thành công cho cuộc họp: %s", meeting.getTitle());
     }
 }

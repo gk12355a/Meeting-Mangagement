@@ -24,6 +24,7 @@ public class Meeting {
 
     private Set<MeetingParticipant> participants = new HashSet<>(); // Người tham dự
     private BookingStatus status;
+    private boolean isCheckedIn = false;
 
     // Constructor cho nghiệp vụ tạo mới
     public Meeting(String title, LocalDateTime startTime, LocalDateTime endTime,
@@ -34,6 +35,7 @@ public class Meeting {
         this.room = room;
         this.organizer = organizer;
         this.status = BookingStatus.CONFIRMED;
+        this.isCheckedIn = false;
 
         // Tự động thêm Người tổ chức (Organizer) là ACCEPTED
         this.participants.add(
@@ -51,6 +53,15 @@ public class Meeting {
     }
 
     // --- QUY TẮC NGHIỆP VỤ (Business Rules) ---
+    public void checkIn() {
+        if (this.status != BookingStatus.CONFIRMED) {
+            throw new PolicyViolationException("Cuộc họp đã bị hủy, không thể check-in.");
+        }
+        if (this.isCheckedIn) {
+            throw new PolicyViolationException("Cuộc họp đã được check-in rồi.");
+        }
+        this.isCheckedIn = true;
+    }
 
     /**
      * Nghiệp vụ Hủy cuộc họp (US-2)

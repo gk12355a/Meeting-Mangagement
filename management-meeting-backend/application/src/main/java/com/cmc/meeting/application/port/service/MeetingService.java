@@ -2,6 +2,7 @@ package com.cmc.meeting.application.port.service;
 
 import java.util.List;
 
+import com.cmc.meeting.application.dto.meeting.CheckInRequest;
 import com.cmc.meeting.application.dto.meeting.MeetingResponseRequest;
 import com.cmc.meeting.application.dto.request.MeetingCreationRequest;
 import com.cmc.meeting.application.dto.request.MeetingUpdateRequest;
@@ -23,4 +24,5 @@ public interface MeetingService {
     MeetingDTO updateMeeting(Long meetingId, MeetingUpdateRequest request, Long currentUserId);
     void respondToInvitation(Long meetingId, MeetingResponseRequest request, Long currentUserId);
     String respondByLink(String token, ParticipantStatus status);
+    String checkIn(CheckInRequest request, Long currentUserId);
 }

@@ -20,4 +20,5 @@ public interface MeetingRepository {
     List<Meeting> findAllByUserId(Long userId);
     List<Meeting> findConfirmedMeetingsInDateRange(LocalDateTime from, LocalDateTime to);
     Optional<Meeting> findMeetingByParticipantToken(String token);
+    Optional<Meeting> findCheckInEligibleMeeting(Long organizerId, Long roomId, LocalDateTime now);
 }
