@@ -146,4 +146,11 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
                 .map(this::toDomain) // Dùng lại helper toDomain
                 .collect(Collectors.toList());
     }
+    // BỔ SUNG: (US-5)
+    @Override
+    public List<Meeting> findMeetingsForUsersInDateRange(Set<Long> userIds, LocalDateTime from, LocalDateTime to) {
+        return jpaRepository.findMeetingsForUsersInDateRange(userIds, from, to).stream()
+                .map(this::toDomain) // Dùng lại helper toDomain
+                .collect(Collectors.toList());
+    }
 }

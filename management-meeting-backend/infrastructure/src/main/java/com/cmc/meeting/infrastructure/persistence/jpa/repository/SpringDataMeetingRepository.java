@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity, Long> {
 
@@ -56,4 +57,15 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
            // startTime đã qua thời gian cutoff (vd: 15 phút)
            "AND m.startTime < :cutoffTime") 
     List<MeetingEntity> findUncheckedInMeetings(@Param("cutoffTime") LocalDateTime cutoffTime);
+    // BỔ SUNG: (US-5)
+    @Query("SELECT m FROM MeetingEntity m JOIN m.participants p " +
+           "WHERE m.status = 'CONFIRMED' " +
+           // Thời gian họp (m) chồng chéo với khoảng thời gian tìm kiếm (from, to)
+           "AND m.startTime < :to AND m.endTime > :from " +
+           // VÀ (p) là một trong các user trong danh sách
+           "AND p.userId IN :userIds")
+    List<MeetingEntity> findMeetingsForUsersInDateRange(
+            @Param("userIds") Set<Long> userIds,
+            @Param("from") LocalDateTime from, 
+            @Param("to") LocalDateTime to);
 }

@@ -5,6 +5,7 @@ import com.cmc.meeting.domain.model.Meeting;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 // Đây là "Hợp đồng" (Contract)
 // Nó không biết gì về JPA hay MyBatiS
@@ -22,4 +23,5 @@ public interface MeetingRepository {
     Optional<Meeting> findMeetingByParticipantToken(String token);
     Optional<Meeting> findCheckInEligibleMeeting(Long organizerId, Long roomId, LocalDateTime now);
     List<Meeting> findUncheckedInMeetings(LocalDateTime cutoffTime);
+    List<Meeting> findMeetingsForUsersInDateRange(Set<Long> userIds, LocalDateTime from, LocalDateTime to);
 }
