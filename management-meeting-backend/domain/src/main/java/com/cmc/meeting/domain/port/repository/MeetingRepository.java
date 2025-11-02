@@ -24,4 +24,5 @@ public interface MeetingRepository {
     Optional<Meeting> findCheckInEligibleMeeting(Long organizerId, Long roomId, LocalDateTime now);
     List<Meeting> findUncheckedInMeetings(LocalDateTime cutoffTime);
     List<Meeting> findMeetingsForUsersInDateRange(Set<Long> userIds, LocalDateTime from, LocalDateTime to);
+    List<Meeting> findCanceledMeetingsInDateRange(LocalDateTime from, LocalDateTime to);
 }

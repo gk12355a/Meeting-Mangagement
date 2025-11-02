@@ -1,5 +1,6 @@
 package com.cmc.meeting.application.service;
 
+import com.cmc.meeting.application.dto.report.CancelationReportDTO;
 import com.cmc.meeting.application.dto.report.RoomUsageReportDTO;
 import com.cmc.meeting.application.port.service.ReportService;
 import com.cmc.meeting.domain.model.Meeting;
@@ -67,6 +68,29 @@ public class ReportServiceImpl implements ReportService {
 
                     return dto;
                 })
+                .collect(Collectors.toList());
+    }
+    // BỔ SUNG: (US-23)
+    @Override
+    public List<CancelationReportDTO> getCancelationReport(LocalDate fromDate, LocalDate toDate) {
+
+        LocalDateTime from = fromDate.atStartOfDay();
+        LocalDateTime to = toDate.atTime(LocalTime.MAX);
+
+        // 1. Lấy dữ liệu thô
+        List<Meeting> canceledMeetings = meetingRepository.findCanceledMeetingsInDateRange(from, to);
+
+        // 2. Tổng hợp (Aggregation) bằng Java Stream
+        // Nhóm theo 'cancelReason' và đếm số lần xuất hiện
+        Map<String, Long> reportMap = canceledMeetings.stream()
+                .collect(Collectors.groupingBy(
+                        Meeting::getCancelReason, // Nhóm theo lý do
+                        Collectors.counting()      // Đếm số lượng
+                ));
+
+        // 3. Chuyển đổi Map sang List<DTO>
+        return reportMap.entrySet().stream()
+                .map(entry -> new CancelationReportDTO(entry.getKey(), entry.getValue()))
                 .collect(Collectors.toList());
     }
 }

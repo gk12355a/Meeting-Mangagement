@@ -68,4 +68,12 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
             @Param("userIds") Set<Long> userIds,
             @Param("from") LocalDateTime from, 
             @Param("to") LocalDateTime to);
+    // BỔ SUNG: (US-23)
+    // Tìm các cuộc họp đã 'CANCELLED' trong khoảng thời gian
+    @Query("SELECT m FROM MeetingEntity m " +
+           "WHERE m.status = 'CANCELLED' " +
+           "AND m.cancelledAt >= :from AND m.cancelledAt <= :to")
+    List<MeetingEntity> findCanceledMeetingsInDateRange(
+            @Param("from") LocalDateTime from, 
+            @Param("to") LocalDateTime to);
 }

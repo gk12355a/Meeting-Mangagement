@@ -153,4 +153,11 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
                 .map(this::toDomain) // Dùng lại helper toDomain
                 .collect(Collectors.toList());
     }
+    // BỔ SUNG: (US-23)
+    @Override
+    public List<Meeting> findCanceledMeetingsInDateRange(LocalDateTime from, LocalDateTime to) {
+        return jpaRepository.findCanceledMeetingsInDateRange(from, to).stream()
+                .map(this::toDomain) // Dùng lại helper toDomain
+                .collect(Collectors.toList());
+    }
 }

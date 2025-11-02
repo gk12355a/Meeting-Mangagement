@@ -1,5 +1,6 @@
 package com.cmc.meeting.web.controller;
 
+import com.cmc.meeting.application.dto.report.CancelationReportDTO;
 import com.cmc.meeting.application.dto.report.RoomUsageReportDTO;
 import com.cmc.meeting.application.port.service.ReportService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,6 +37,16 @@ public class ReportController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
 
         List<RoomUsageReportDTO> report = reportService.getRoomUsageReport(from, to);
+        return ResponseEntity.ok(report);
+    }
+    // BỔ SUNG: (US-23)
+    @GetMapping("/cancelation-stats")
+    @Operation(summary = "Thống kê lý do hủy họp (US-23)")
+    public ResponseEntity<List<CancelationReportDTO>> getCancelationStats(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+
+        List<CancelationReportDTO> report = reportService.getCancelationReport(from, to);
         return ResponseEntity.ok(report);
     }
 }
