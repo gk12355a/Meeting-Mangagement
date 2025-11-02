@@ -1,5 +1,6 @@
 package com.cmc.meeting.application.task;
 
+import com.cmc.meeting.application.port.service.AppConfigService;
 import com.cmc.meeting.domain.model.Meeting;
 import com.cmc.meeting.domain.port.repository.MeetingRepository;
 import org.slf4j.Logger;
@@ -17,12 +18,14 @@ public class ScheduledTaskService {
     private static final Logger log = LoggerFactory.getLogger(ScheduledTaskService.class);
 
     private final MeetingRepository meetingRepository;
-    
+    private final AppConfigService appConfigService;
     // Định nghĩa thời gian chờ (vd: Hủy nếu quá 15 phút)
     private static final int GRACE_PERIOD_MINUTES = 15;
 
-    public ScheduledTaskService(MeetingRepository meetingRepository) {
+    public ScheduledTaskService(MeetingRepository meetingRepository, 
+                                AppConfigService appConfigService) {
         this.meetingRepository = meetingRepository;
+        this.appConfigService = appConfigService;
     }
 
    
@@ -36,6 +39,9 @@ public class ScheduledTaskService {
         log.info("SCHEDULER: Đang chạy tác vụ tự động giải phóng phòng...");
 
         // 1. Tính thời gian cutoff (vd: 15 phút trước)
+        int gracePeriodMinutes = appConfigService.getIntValue(
+            "auto.cancel.grace.minutes", 15 // 15 là giá trị mặc định
+        );
         LocalDateTime cutoffTime = LocalDateTime.now().minusMinutes(GRACE_PERIOD_MINUTES);
 
         // 2. Tìm các cuộc họp "ma"
@@ -49,7 +55,9 @@ public class ScheduledTaskService {
         // 3. Hủy các cuộc họp đó
         log.warn("SCHEDULER: Tìm thấy {} cuộc họp ma. Đang tiến hành hủy:", ghostMeetings.size());
         
-        final String reason = "Tự động hủy do không check-in sau 15 phút."; // Define reason
+        final String reason = String.format(
+            "Tự động hủy do không check-in sau %d phút.", gracePeriodMinutes
+        );
 
         for (Meeting meeting : ghostMeetings) {
             log.warn("-> Hủy Meeting ID: {} (Chủ đề: {}) vì không check-in.", 

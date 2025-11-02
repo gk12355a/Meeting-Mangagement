@@ -12,3 +12,7 @@ INSERT INTO users (id, username, full_name, password) VALUES (1, 'user1@cmc.com'
 
 INSERT INTO users (id, username, full_name, password) VALUES (2, 'user2@cmc.com', 'User Hai', @hashed_password) 
     ON DUPLICATE KEY UPDATE username='user2@cmc.com', password=@hashed_password;
+
+INSERT INTO app_configuration (config_key, config_value, description) 
+VALUES ('auto.cancel.grace.minutes', '15', 'Thời gian (phút) chờ check-in trước khi tự động hủy họp')
+    ON DUPLICATE KEY UPDATE config_value='15';

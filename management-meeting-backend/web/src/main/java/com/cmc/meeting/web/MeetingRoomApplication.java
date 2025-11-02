@@ -5,6 +5,7 @@ import org.mybatis.spring.annotation.MapperScan; // <-- 1. Import mới
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.domain.EntityScan; // <-- 2. Import mới
+import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories; // <-- 3. Import mới
 import org.springframework.scheduling.annotation.EnableAsync;
@@ -28,6 +29,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @EnableAsync
 @EnableScheduling
+@EnableCaching
 public class MeetingRoomApplication {
 
     public static void main(String[] args) {
