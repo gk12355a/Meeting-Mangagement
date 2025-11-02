@@ -7,5 +7,5 @@ public class Device {
     private Long id;
     private String name;
     private String description;
-    // (Chúng ta có thể thêm 'status' (Bảo trì, Sẵn có) sau)
+    private DeviceStatus status = DeviceStatus.AVAILABLE;
 }

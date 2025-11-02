@@ -1,5 +1,7 @@
 package com.cmc.meeting.infrastructure.persistence.jpa.entity;
 
+import com.cmc.meeting.domain.model.DeviceStatus;
+
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -15,4 +17,7 @@ public class DeviceEntity {
     private String name;
 
     private String description;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private DeviceStatus status = DeviceStatus.AVAILABLE;
 }

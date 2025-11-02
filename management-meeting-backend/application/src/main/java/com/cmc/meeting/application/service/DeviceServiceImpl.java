@@ -36,6 +36,7 @@ public class DeviceServiceImpl implements DeviceService {
     @Override
     public DeviceDTO createDevice(DeviceRequest request) {
         Device newDevice = modelMapper.map(request, Device.class);
+        // newDevice.setStatus(request.getStatus()); // ModelMapper tự làm
         Device savedDevice = deviceRepository.save(newDevice);
         return modelMapper.map(savedDevice, DeviceDTO.class);
     }
@@ -47,6 +48,7 @@ public class DeviceServiceImpl implements DeviceService {
 
         existingDevice.setName(request.getName());
         existingDevice.setDescription(request.getDescription());
+        existingDevice.setStatus(request.getStatus());
 
         Device updatedDevice = deviceRepository.save(existingDevice);
         return modelMapper.map(updatedDevice, DeviceDTO.class);

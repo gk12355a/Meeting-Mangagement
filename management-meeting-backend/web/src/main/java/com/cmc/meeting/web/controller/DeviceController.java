@@ -16,9 +16,9 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/devices")
-@Tag(name = "Device API", description = "API Quản lý thiết bị (Chỉ Admin)")
+@Tag(name = "Device API", description = "API Quản lý thiết bị (Admin) và Tra cứu (User)")
 @SecurityRequirement(name = "bearerAuth")
-@PreAuthorize("hasRole('ADMIN')") // <-- BẢO VỆ TOÀN BỘ CONTROLLER NÀY
+// @PreAuthorize("hasRole('ADMIN')") // <-- BẢO VỆ TOÀN BỘ CONTROLLER NÀY
 public class DeviceController {
 
     private final DeviceService deviceService;
@@ -27,8 +27,14 @@ public class DeviceController {
         this.deviceService = deviceService;
     }
 
+    /**
+     * API Lấy danh sách thiết bị (US-13)
+     * Dành cho tất cả user đã đăng nhập
+     */
     @GetMapping
-    @Operation(summary = "Lấy danh sách tất cả thiết bị (Admin)")
+    @Operation(summary = "Lấy danh sách tất cả thiết bị (Cho tất cả user)")
+    // BỔ SUNG: Cho phép USER
+    @PreAuthorize("isAuthenticated()") 
     public ResponseEntity<List<DeviceDTO>> getAllDevices() {
         List<DeviceDTO> devices = deviceService.getAllDevices();
         return ResponseEntity.ok(devices);
@@ -36,6 +42,7 @@ public class DeviceController {
 
     @PostMapping
     @Operation(summary = "Tạo thiết bị mới (Admin)")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<DeviceDTO> createDevice(@Valid @RequestBody DeviceRequest request) {
         DeviceDTO createdDevice = deviceService.createDevice(request);
         return new ResponseEntity<>(createdDevice, HttpStatus.CREATED);
@@ -43,6 +50,7 @@ public class DeviceController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Cập nhật thông tin thiết bị (Admin)")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<DeviceDTO> updateDevice(@PathVariable Long id,
                                                 @Valid @RequestBody DeviceRequest request) {
         DeviceDTO updatedDevice = deviceService.updateDevice(id, request);
@@ -51,6 +59,7 @@ public class DeviceController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Xóa một thiết bị (Admin)")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> deleteDevice(@PathVariable Long id) {
         deviceService.deleteDevice(id);
         return ResponseEntity.ok("Đã xóa thiết bị thành công.");
