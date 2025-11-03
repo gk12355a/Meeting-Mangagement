@@ -1,41 +1,73 @@
 package com.cmc.meeting.application.service;
 
+// DTOs
 import com.cmc.meeting.application.dto.auth.AuthResponse;
 import com.cmc.meeting.application.dto.auth.LoginRequest;
 import com.cmc.meeting.application.dto.auth.RegisterRequest;
+import com.cmc.meeting.application.dto.auth.ForgotPasswordRequest;
+import com.cmc.meeting.application.dto.auth.ResetPasswordRequest;
+
+// Ports (Hợp đồng)
 import com.cmc.meeting.application.port.service.AuthService;
-import com.cmc.meeting.domain.model.User;
-import com.cmc.meeting.domain.port.repository.UserRepository;
+import com.cmc.meeting.application.port.notification.EmailNotificationPort;
 import com.cmc.meeting.application.port.security.TokenProvider;
+
+// Domain (Lõi nghiệp vụ)
+import com.cmc.meeting.domain.model.PasswordResetToken;
 import com.cmc.meeting.domain.model.Role;
+import com.cmc.meeting.domain.model.User;
+import com.cmc.meeting.domain.port.repository.PasswordResetTokenRepository;
+import com.cmc.meeting.domain.port.repository.UserRepository;
+
+// Spring & Java
+import jakarta.persistence.EntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class AuthServiceImpl implements AuthService {
 
+    private static final Logger log = LoggerFactory.getLogger(AuthServiceImpl.class);
+
+    // Dependencies (Inject qua Constructor)
     private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final TokenProvider tokenProvider; // <-- 2. Sửa kiểu dữ liệu
+    private final TokenProvider tokenProvider;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final EmailNotificationPort emailSender;
 
     public AuthServiceImpl(AuthenticationManager authenticationManager,
                            UserRepository userRepository,
                            PasswordEncoder passwordEncoder,
-                           TokenProvider tokenProvider) { // <-- 3. Sửa kiểu dữ liệu
+                           TokenProvider tokenProvider,
+                           PasswordResetTokenRepository passwordResetTokenRepository,
+                           EmailNotificationPort emailSender) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenProvider = tokenProvider;
+        this.passwordResetTokenRepository = passwordResetTokenRepository;
+        this.emailSender = emailSender;
     }
-
+    
+    /**
+     * API Đăng nhập
+     */
     @Override
     public AuthResponse login(LoginRequest loginRequest) {
-        // 1. Xác thực username/password (dùng Spring Security)
+        // 1. Xác thực (Dùng SecurityConfig)
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         loginRequest.getUsername(),
@@ -43,34 +75,99 @@ public class AuthServiceImpl implements AuthService {
                 )
         );
 
-        // 2. Nếu xác thực thành công, set vào SecurityContext
+        // 2. Set vào SecurityContext
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        // 3. Lấy thông tin user (để tạo token)
-        // Cần lấy ID và Username
-        User user = userRepository.findByUsername(loginRequest.getUsername()).get();
-
+        // 3. Lấy thông tin User (để tạo token)
+        User user = userRepository.findByUsername(loginRequest.getUsername())
+                .orElseThrow(() -> new EntityNotFoundException("Lỗi logic: User đã xác thực nhưng không tìm thấy"));
+        
         // 4. Tạo token
         String token = tokenProvider.generateToken(user.getId(), user.getUsername());
 
         return new AuthResponse(token);
     }
 
+    /**
+     * API Đăng ký
+     */
     @Override
     public String register(RegisterRequest registerRequest) {
+        // 1. Kiểm tra username (email) đã tồn tại chưa
         if (userRepository.findByUsername(registerRequest.getUsername()).isPresent()) {
             throw new RuntimeException("Lỗi: Username (Email) đã được sử dụng!");
         }
 
+        // 2. Tạo đối tượng User mới
         User newUser = new User();
         newUser.setUsername(registerRequest.getUsername());
         newUser.setFullName(registerRequest.getFullName());
+        
+        // 3. Băm mật khẩu
         newUser.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
         
-        // BỔ SUNG: Gán quyền mặc định
+        // 4. Gán quyền mặc định (ROLE_USER)
         newUser.getRoles().add(Role.ROLE_USER);
         
+        // 5. Lưu vào CSDL
         userRepository.save(newUser);
+
         return "Đăng ký người dùng thành công!";
+    }
+
+    /**
+     * (BS-5.1 & 5.2) Yêu cầu Đặt lại Mật khẩu & Gửi Mail
+     */
+    @Override
+    public String forgotPassword(ForgotPasswordRequest request) {
+        Optional<User> userOpt = userRepository.findByUsername(request.getEmail());
+
+        if (userOpt.isEmpty()) {
+            // Không bao giờ báo "Không tìm thấy email" (vì lý do bảo mật)
+            log.warn("Yêu cầu reset mật khẩu cho email không tồn tại: {}", request.getEmail());
+            return "Nếu email tồn tại, bạn sẽ nhận được link đặt lại mật khẩu.";
+        }
+        
+        User user = userOpt.get();
+
+        // 2. Tạo Token
+        String token = UUID.randomUUID().toString();
+        LocalDateTime expiryDate = LocalDateTime.now().plusMinutes(15); // Hết hạn sau 15p
+        
+        PasswordResetToken resetToken = new PasswordResetToken(token, user, expiryDate);
+        passwordResetTokenRepository.save(resetToken);
+        
+        // 3. Gửi Mail (Gọi Port)
+        // (Adapter ở infrastructure sẽ lo việc tạo HTML và gửi)
+        emailSender.sendPasswordResetEmail(user, token);
+        
+        return "Nếu email tồn tại, bạn sẽ nhận được link đặt lại mật khẩu.";
+    }
+
+    /**
+     * (BS-5.3) Hoàn tất Đặt lại Mật khẩu
+     */
+    @Override
+    @Transactional
+    public String resetPassword(ResetPasswordRequest request) {
+        // 1. Tìm token
+        PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(request.getToken())
+                .orElseThrow(() -> new EntityNotFoundException("Token không hợp lệ."));
+
+        // 2. Kiểm tra hết hạn
+        if (resetToken.isExpired()) {
+            passwordResetTokenRepository.delete(resetToken); // Xóa token cũ
+            throw new RuntimeException("Token đã hết hạn. Vui lòng yêu cầu lại.");
+        }
+        
+        // 3. Lấy user và cập nhật mật khẩu
+        User user = resetToken.getUser();
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        // 4. Xóa token (chỉ dùng 1 lần)
+        passwordResetTokenRepository.delete(resetToken);
+        
+        return "Đặt lại mật khẩu thành công.";
     }
 }

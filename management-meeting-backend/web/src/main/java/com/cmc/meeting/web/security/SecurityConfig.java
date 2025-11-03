@@ -66,8 +66,8 @@ public class SecurityConfig {
                 // --- PHÂN QUYỀN ---
                 // Cho phép các API này (Swagger, Auth)
                 .requestMatchers(
-                    "/api/v1/auth/**",
-                    "/api/v1/meetings/respond-by-link", // <-- BỔ SUNG
+                    "/api/v1/auth/**", // Bao gồm /login, /register, /forgot-password, /reset-password
+                    "/api/v1/meetings/respond-by-link",
                     "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**"
                 ).permitAll()
                 

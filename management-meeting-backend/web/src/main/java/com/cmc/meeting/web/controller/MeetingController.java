@@ -8,6 +8,7 @@ import com.cmc.meeting.application.dto.request.MeetingUpdateRequest;
 import com.cmc.meeting.application.dto.response.MeetingDTO;
 import com.cmc.meeting.application.port.service.MeetingService;
 import com.cmc.meeting.domain.model.ParticipantStatus;
+import com.cmc.meeting.domain.model.User;
 // BỔ SUNG: Import 2 thư viện này
 import com.cmc.meeting.domain.port.repository.UserRepository;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -235,4 +236,30 @@ public class MeetingController {
 
                 return ResponseEntity.ok("Đã hủy các cuộc họp (chưa diễn ra) trong chuỗi thành công.");
         }
+
+        /**
+         * API Cập nhật toàn bộ chuỗi lịch định kỳ (BS-2.1)
+         * (Bằng cách hủy cũ, tạo mới)
+         */
+        @PutMapping("/series/{seriesId}")
+        @Operation(summary = "Cập nhật toàn bộ chuỗi lịch định kỳ (chỉ người tổ chức)")
+        public ResponseEntity<MeetingDTO> updateMeetingSeries(
+                        @PathVariable String seriesId,
+                        @Valid @RequestBody MeetingCreationRequest request,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                User currentUser = userRepository.findByUsername(userDetails.getUsername())
+                                .orElseThrow(() -> new RuntimeException("Lỗi: Không tìm thấy user từ token"));
+
+                // (request phải chứa RecurrenceRule mới)
+                if (request.getRecurrenceRule() == null) {
+                        throw new IllegalArgumentException("Cập nhật chuỗi phải bao gồm RecurrenceRule mới.");
+                }
+
+                MeetingDTO firstMeeting = meetingService.updateMeetingSeries(
+                                seriesId, request, currentUser.getId());
+
+                return ResponseEntity.ok(firstMeeting);
+        }
+
 }

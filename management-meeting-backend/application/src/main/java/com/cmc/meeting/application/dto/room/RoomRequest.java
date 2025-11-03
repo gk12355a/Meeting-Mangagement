@@ -2,9 +2,12 @@ package com.cmc.meeting.application.dto.room;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import java.util.List;
 import com.cmc.meeting.domain.model.Role; // Bổ sung
+import com.cmc.meeting.domain.model.RoomStatus;
+
 import java.util.Set; // Bổ sung
 @Data
 public class RoomRequest {
@@ -19,4 +22,6 @@ public class RoomRequest {
 
     private List<String> fixedDevices; // (BS-14.2)
     private Set<Role> requiredRoles;
+    @NotNull(message = "Trạng thái không được để trống")
+    private RoomStatus status;
 }

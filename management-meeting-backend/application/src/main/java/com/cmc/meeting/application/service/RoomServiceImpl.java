@@ -37,7 +37,7 @@ public class RoomServiceImpl implements RoomService {
     @Override
     public RoomDTO createRoom(RoomRequest request) {
         Room newRoom = modelMapper.map(request, Room.class);
-        // newRoom.setRequiredRoles(request.getRequiredRoles()); // ModelMapper tự làm
+        // newRoom.setStatus(request.getStatus()); // ModelMapper tự làm
         Room savedRoom = roomRepository.save(newRoom);
         return modelMapper.map(savedRoom, RoomDTO.class);
     }
@@ -53,6 +53,7 @@ public class RoomServiceImpl implements RoomService {
         existingRoom.setLocation(request.getLocation());
         existingRoom.setFixedDevices(request.getFixedDevices());
         existingRoom.setRequiredRoles(request.getRequiredRoles());
+        existingRoom.setStatus(request.getStatus());
         Room updatedRoom = roomRepository.save(existingRoom);
         return modelMapper.map(updatedRoom, RoomDTO.class);
     }

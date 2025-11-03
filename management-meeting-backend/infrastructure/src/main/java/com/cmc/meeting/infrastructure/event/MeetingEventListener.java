@@ -63,7 +63,7 @@ public class MeetingEventListener {
 
             // 3. GỬI CHO NHÂN VIÊN (Internal)
             // (Dùng template có nút bấm)
-            String internalTemplate = "email-template.html";
+            String internalTemplateKey = "email.template.internal";
             String baseUrl = "http://localhost:8080/api/v1/meetings/respond-by-link";
 
             for (MeetingParticipant participant : meeting.getParticipants()) {
@@ -76,7 +76,7 @@ public class MeetingEventListener {
                     variables.put("acceptUrl", String.format("%s?token=%s&status=ACCEPTED", baseUrl, token));
                     variables.put("declineUrl", String.format("%s?token=%s&status=DECLINED", baseUrl, token));
 
-                    String htmlBody = thymeleafService.processTemplate(internalTemplate, variables);
+                    String htmlBody = thymeleafService.processTemplate(internalTemplateKey, variables);
 
                     emailSender.sendHtmlEmail(
                         participant.getUser().getUsername(), 
@@ -88,11 +88,11 @@ public class MeetingEventListener {
             
             // 4. GỬI CHO KHÁCH (External) - (BS-30)
             // (Dùng template mới, không có nút bấm)
-            String guestTemplate = "guest-invite-template.html";
+            String guestTemplateKey = "email.template.guest";
             // (Biến 'variables' chung không cần link 'acceptUrl', 
             // Thymeleaf sẽ bỏ qua nếu template không dùng)
             
-            String guestHtmlBody = thymeleafService.processTemplate(guestTemplate, variables);
+            String guestHtmlBody = thymeleafService.processTemplate(guestTemplateKey, variables);
 
             for (String guestEmail : meeting.getGuestEmails()) {
                 log.info("-> Đang gửi HTML email (Guest) cho: {}", guestEmail);

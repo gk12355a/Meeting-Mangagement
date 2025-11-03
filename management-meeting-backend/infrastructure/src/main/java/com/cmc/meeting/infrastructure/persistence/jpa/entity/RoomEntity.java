@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Data;
 import java.util.List;
 
+import com.cmc.meeting.domain.model.RoomStatus;
+
 @Data
 @Entity
 @Table(name = "rooms")
@@ -24,4 +26,9 @@ public class RoomEntity {
     @CollectionTable(name = "room_devices", joinColumns = @JoinColumn(name = "room_id"))
     @Column(name = "device_name")
     private List<String> fixedDevices;
+
+    // BỔ SUNG: (BS-11.1)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private RoomStatus status = RoomStatus.AVAILABLE;
 }

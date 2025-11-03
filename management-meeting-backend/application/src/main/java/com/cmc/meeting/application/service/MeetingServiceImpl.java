@@ -385,6 +385,10 @@ public class MeetingServiceImpl implements MeetingService {
     private void checkAccessAndConflicts(Room room, User organizer, Set<User> participants,
             LocalDateTime startTime, LocalDateTime endTime) {
 
+        if (room.getStatus() == RoomStatus.UNDER_MAINTENANCE) {
+            throw new PolicyViolationException(
+                    String.format("Phòng '%s' đang bảo trì, không thể đặt.", room.getName()));
+        }
         // 1. KIỂM TRA QUYỀN ĐẶT PHÒNG (US-21)
         Set<Role> requiredRoles = room.getRequiredRoles();
         if (requiredRoles != null && !requiredRoles.isEmpty()) {
@@ -455,4 +459,39 @@ public class MeetingServiceImpl implements MeetingService {
         }
         return slots;
     }
+
+    // BỔ SUNG: (BS-2.1)
+    @Override
+    public MeetingDTO updateMeetingSeries(String seriesId, MeetingCreationRequest request, Long currentUserId) {
+
+        // 1. Lấy danh sách họp cũ
+        List<Meeting> meetingsInSeries = meetingRepository.findAllBySeriesId(seriesId);
+        if (meetingsInSeries.isEmpty()) {
+            throw new EntityNotFoundException("Không tìm thấy chuỗi cuộc họp.");
+        }
+
+        // 2. Kiểm tra quyền sở hữu (dùng cuộc họp đầu tiên)
+        Meeting firstMeeting = meetingsInSeries.get(0);
+        if (!firstMeeting.getOrganizer().getId().equals(currentUserId)) {
+            throw new PolicyViolationException("Chỉ người tổ chức mới có quyền sửa chuỗi họp này.");
+        }
+
+        // 3. Hủy tất cả các cuộc họp CHƯA DIỄN RA
+        String reason = "Cuộc họp định kỳ đã được cập nhật hoặc thay đổi.";
+        for (Meeting meeting : meetingsInSeries) {
+            if (meeting.getStartTime().isAfter(LocalDateTime.now()) &&
+                    meeting.getStatus() == BookingStatus.CONFIRMED) {
+
+                log.info("-> (Update) Hủy Meeting ID: {}", meeting.getId());
+                meeting.cancelMeeting(reason);
+                meetingRepository.save(meeting);
+            }
+        }
+
+        // 4. Tạo chuỗi mới (Tái sử dụng toàn bộ logic)
+        // (createMeeting sẽ tự kiểm tra xung đột mới)
+        log.info("-> (Update) Đang tạo chuỗi họp mới thay thế...");
+        return this.createMeeting(request, currentUserId);
+    }
+
 }

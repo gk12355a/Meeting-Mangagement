@@ -27,4 +27,6 @@ public interface MeetingService {
     String respondByLink(String token, ParticipantStatus status);
     String checkIn(CheckInRequest request, Long currentUserId);
     void cancelMeetingSeries(String seriesId, MeetingCancelRequest request, Long currentUserId);
+    // BỔ SUNG: (BS-2.1)
+    MeetingDTO updateMeetingSeries(String seriesId, MeetingCreationRequest request, Long currentUserId);
 }
