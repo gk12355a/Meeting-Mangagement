@@ -78,4 +78,10 @@ public class MeetingEntity {
     @Column(name = "role_name", nullable = false)
     @Enumerated(EnumType.STRING)
     private Set<Role> requiredRoles = new HashSet<>();
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "meeting_guests", joinColumns = @JoinColumn(name = "meeting_id"))
+    @Column(name = "email", nullable = false)
+    private Set<String> guestEmails = new HashSet<>();
+
 }

@@ -42,4 +42,5 @@ public class MeetingCreationRequest {
     @Valid // Validate lồng
     private RecurrenceRuleDTO recurrenceRule; // (Nếu = null, là họp 1 lần)
     private Long onBehalfOfUserId;
+    private Set<String> guestEmails;
 }

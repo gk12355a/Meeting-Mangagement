@@ -39,4 +39,6 @@ public class MeetingDTO {
     }
 
     private Set<DeviceDTO> devices;
+
+    private Set<String> guestEmails;
 }

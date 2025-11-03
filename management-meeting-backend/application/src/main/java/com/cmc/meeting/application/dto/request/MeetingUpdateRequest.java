@@ -34,4 +34,6 @@ public class MeetingUpdateRequest {
     @Size(min = 1)
     private Set<Long> participantIds;
     private Set<Long> deviceIds;
+
+    private Set<String> guestEmails;
 }

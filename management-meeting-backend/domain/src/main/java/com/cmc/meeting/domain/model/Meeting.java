@@ -30,10 +30,12 @@ public class Meeting {
     private User creator; // Người tạo (vd: Thư ký, người nhấn nút)
     // BỔ SUNG: (US-12)
     private Set<Device> devices = new HashSet<>();
+    private Set<String> guestEmails = new HashSet<>();
 
     // Constructor cho nghiệp vụ tạo mới
     public Meeting(String title, LocalDateTime startTime, LocalDateTime endTime,
-            Room room, User organizer, User creator, Set<User> participantUsers, Set<Device> devices, String seriesId) {
+            Room room, User organizer, User creator, Set<User> participantUsers, Set<Device> devices,
+            Set<String> guestEmails, String seriesId) {
         this.title = title;
         this.startTime = startTime;
         this.endTime = endTime;
@@ -44,6 +46,7 @@ public class Meeting {
         this.isCheckedIn = false;
         this.seriesId = seriesId;
         this.devices = devices;
+        this.guestEmails = guestEmails;
         // Tự động thêm Người tổ chức (Organizer) là ACCEPTED
         this.participants.add(
                 new MeetingParticipant(organizer, ParticipantStatus.ACCEPTED, null));
