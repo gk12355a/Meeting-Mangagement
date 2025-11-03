@@ -3,6 +3,8 @@ package com.cmc.meeting.infrastructure.event;
 import com.cmc.meeting.application.port.notification.EmailNotificationPort;
 import com.cmc.meeting.domain.event.MeetingCreatedEvent;
 import com.cmc.meeting.domain.model.Meeting;
+import com.cmc.meeting.domain.model.MeetingParticipant;
+import com.cmc.meeting.domain.model.ParticipantStatus;
 import com.cmc.meeting.domain.port.repository.MeetingRepository;
 import com.cmc.meeting.infrastructure.notification.ThymeleafEmailService;
 
@@ -49,45 +51,57 @@ public class MeetingEventListener {
                     .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy meeting cho event"));
 
             String subject = "Thư mời họp: " + meeting.getTitle();
-            String baseUrl = "http://localhost:8080/api/v1/meetings/respond-by-link"; // (API chúng ta sẽ tạo)
 
-            // 2. Lặp qua từng người tham dự
-            meeting.getParticipants().forEach(participant -> {
-                
-                // Chỉ gửi cho người PENDING (và có token)
-                if (participant.getStatus() == com.cmc.meeting.domain.model.ParticipantStatus.PENDING 
-                        && participant.getResponseToken() != null) {
-                    
-                    log.info("-> Đang chuẩn bị HTML email cho: {}", participant.getUser().getUsername());
+            // 2. TẠO CÁC BIẾN (VARIABLES) CHUNG
+            Map<String, Object> variables = new HashMap<>();
+            variables.put("title", meeting.getTitle());
+            variables.put("startTime", meeting.getStartTime().toString()); // (Cần format đẹp hơn sau)
+            variables.put("endTime", meeting.getEndTime().toString());
+            variables.put("roomName", meeting.getRoom().getName());
+            variables.put("organizerName", meeting.getOrganizer().getFullName());
 
-                    // 3. TẠO CÁC BIẾN (VARIABLES) CHO TEMPLATE
-                    // (Làm điều này BÊN TRONG vòng lặp)
-                    Map<String, Object> variables = new HashMap<>();
-                    variables.put("title", meeting.getTitle());
-                    variables.put("startTime", meeting.getStartTime().toString());
-                    variables.put("endTime", meeting.getEndTime().toString());
-                    variables.put("roomName", meeting.getRoom().getName());
-                    variables.put("organizerName", meeting.getOrganizer().getFullName());
+
+            // 3. GỬI CHO NHÂN VIÊN (Internal)
+            // (Dùng template có nút bấm)
+            String internalTemplate = "email-template.html";
+            String baseUrl = "http://localhost:8080/api/v1/meetings/respond-by-link";
+
+            for (MeetingParticipant participant : meeting.getParticipants()) {
+                if (participant.getStatus() == ParticipantStatus.PENDING && participant.getResponseToken() != null) {
                     
-                    // 4. TẠO LINK PHẢN HỒI DUY NHẤT
+                    log.info("-> Đang chuẩn bị HTML email (Internal) cho: {}", participant.getUser().getUsername());
+
+                    // Tạo link phản hồi duy nhất
                     String token = participant.getResponseToken();
-                    String acceptUrl = String.format("%s?token=%s&status=ACCEPTED", baseUrl, token);
-                    String declineUrl = String.format("%s?token=%s&status=DECLINED", baseUrl, token);
+                    variables.put("acceptUrl", String.format("%s?token=%s&status=ACCEPTED", baseUrl, token));
+                    variables.put("declineUrl", String.format("%s?token=%s&status=DECLINED", baseUrl, token));
 
-                    variables.put("acceptUrl", acceptUrl);
-                    variables.put("declineUrl", declineUrl);
+                    String htmlBody = thymeleafService.processTemplate(internalTemplate, variables);
 
-                    // 5. "VẼ" HTML
-                    String htmlBody = thymeleafService.processTemplate("email-template.html", variables);
-
-                    // 6. Gửi email
                     emailSender.sendHtmlEmail(
                         participant.getUser().getUsername(), 
                         subject,
                         htmlBody
                     );
                 }
-            });
+            }
+            
+            // 4. GỬI CHO KHÁCH (External) - (BS-30)
+            // (Dùng template mới, không có nút bấm)
+            String guestTemplate = "guest-invite-template.html";
+            // (Biến 'variables' chung không cần link 'acceptUrl', 
+            // Thymeleaf sẽ bỏ qua nếu template không dùng)
+            
+            String guestHtmlBody = thymeleafService.processTemplate(guestTemplate, variables);
+
+            for (String guestEmail : meeting.getGuestEmails()) {
+                log.info("-> Đang gửi HTML email (Guest) cho: {}", guestEmail);
+                emailSender.sendHtmlEmail(
+                    guestEmail,
+                    subject,
+                    guestHtmlBody
+                );
+            }
 
         } catch (Exception e) {
             log.error("Lỗi xử lý sự kiện tạo cuộc họp (HTML): ", e);
