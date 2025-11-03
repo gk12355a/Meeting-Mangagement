@@ -2,6 +2,7 @@ package com.cmc.meeting.application.service;
 
 import com.cmc.meeting.application.dto.report.CancelationReportDTO;
 import com.cmc.meeting.application.dto.report.RoomUsageReportDTO;
+import com.cmc.meeting.application.dto.report.VisitorReportDTO;
 import com.cmc.meeting.application.port.service.ReportService;
 import com.cmc.meeting.domain.model.Meeting;
 import com.cmc.meeting.domain.model.Room;
@@ -91,6 +92,28 @@ public class ReportServiceImpl implements ReportService {
         // 3. Chuyển đổi Map sang List<DTO>
         return reportMap.entrySet().stream()
                 .map(entry -> new CancelationReportDTO(entry.getKey(), entry.getValue()))
+                .collect(Collectors.toList());
+    }
+    // BỔ SUNG: (BS-31)
+    @Override
+    public List<VisitorReportDTO> getVisitorReport(LocalDate date) {
+
+        LocalDateTime from = date.atStartOfDay();
+        LocalDateTime to = date.atTime(LocalTime.MAX);
+
+        // 1. Lấy dữ liệu thô
+        List<Meeting> meetingsWithGuests = meetingRepository.findMeetingsWithGuestsInDateRange(from, to);
+
+        // 2. Chuyển đổi sang DTO
+        return meetingsWithGuests.stream()
+                .map(meeting -> new VisitorReportDTO(
+                        meeting.getId(),
+                        meeting.getTitle(),
+                        meeting.getStartTime(),
+                        meeting.getRoom().getName(),
+                        meeting.getOrganizer().getFullName(),
+                        meeting.getGuestEmails()
+                ))
                 .collect(Collectors.toList());
     }
 }

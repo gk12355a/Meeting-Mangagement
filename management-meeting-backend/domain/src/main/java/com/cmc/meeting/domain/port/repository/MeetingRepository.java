@@ -26,4 +26,5 @@ public interface MeetingRepository {
     List<Meeting> findMeetingsForUsersInDateRange(Set<Long> userIds, LocalDateTime from, LocalDateTime to);
     List<Meeting> findCanceledMeetingsInDateRange(LocalDateTime from, LocalDateTime to);
     List<Meeting> findAllBySeriesId(String seriesId);
+    List<Meeting> findMeetingsWithGuestsInDateRange(LocalDateTime from, LocalDateTime to);
 }

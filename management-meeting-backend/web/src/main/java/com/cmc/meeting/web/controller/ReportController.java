@@ -2,6 +2,7 @@ package com.cmc.meeting.web.controller;
 
 import com.cmc.meeting.application.dto.report.CancelationReportDTO;
 import com.cmc.meeting.application.dto.report.RoomUsageReportDTO;
+import com.cmc.meeting.application.dto.report.VisitorReportDTO;
 import com.cmc.meeting.application.port.service.ExcelExportService;
 import com.cmc.meeting.application.port.service.ReportService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -96,5 +97,14 @@ public class ReportController {
             // 4. Trả về JSON (như cũ)
             return ResponseEntity.ok(report);
         }
+    }
+    // BỔ SUNG: (BS-31)
+    @GetMapping("/visitors")
+    @Operation(summary = "Báo cáo danh sách khách mời trong ngày (cho Lễ tân)")
+    public ResponseEntity<List<VisitorReportDTO>> getVisitorReport(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+
+        List<VisitorReportDTO> report = reportService.getVisitorReport(date);
+        return ResponseEntity.ok(report);
     }
 }

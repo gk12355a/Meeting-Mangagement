@@ -184,4 +184,12 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
                 .map(this::toDomain) // Dùng lại helper toDomain
                 .collect(Collectors.toList());
     }
+
+    // BỔ SUNG: (BS-31)
+    @Override
+    public List<Meeting> findMeetingsWithGuestsInDateRange(LocalDateTime from, LocalDateTime to) {
+        return jpaRepository.findMeetingsWithGuestsInDateRange(from, to).stream()
+                .map(this::toDomain) // Dùng lại helper toDomain
+                .collect(Collectors.toList());
+    }
 }
