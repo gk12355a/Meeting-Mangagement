@@ -1,12 +1,12 @@
 package com.cmc.meeting.web.security;
 
-// import com.cmc.meeting.web.security.CustomUserDetailsService;
-import org.springframework.security.authentication.AuthenticationProvider;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -14,27 +14,33 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+
+// BỔ SUNG CÁC IMPORT SAU:
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import java.util.List;
+// -------------------------
+
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    // 1. Inject "người gác cổng" của chúng ta
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
-
     private final CustomUserDetailsService customUserDetailsService;
+
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, 
                           CustomUserDetailsService customUserDetailsService) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.customUserDetailsService = customUserDetailsService;
     }
 
-    // 2. Tạo Bean PasswordEncoder (để băm mật khẩu)
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
+    
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
@@ -43,40 +49,60 @@ public class SecurityConfig {
         return authProvider;
     }
 
-    // 3. Tạo Bean AuthenticationManager (cần cho API login)
     @Bean
     public AuthenticationManager authenticationManager(
             AuthenticationConfiguration authenticationConfiguration) throws Exception {
         return authenticationConfiguration.getAuthenticationManager();
     }
 
-    // 4. Cấu hình chuỗi bảo vệ (Filter Chain)
+    // BỔ SUNG: BEAN CẤU HÌNH CORS
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        
+        // Cho phép frontend (Vite) gọi
+        configuration.setAllowedOrigins(List.of("http://localhost:5173")); 
+        
+        // Cho phép các method
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        
+        // Cho phép các header (quan trọng cho JWT)
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        
+        // Cho phép gửi cookie (nếu cần)
+        configuration.setAllowCredentials(true); 
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration); // Áp dụng cho mọi API
+        return source;
+    }
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf.disable()) // Tắt CSRF cho API
-            .sessionManagement(session -> session
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Không dùng session
+            // BỔ SUNG: Áp dụng cấu hình CORS
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             
-            // Tắt Basic Auth (thứ sinh ra password ngẫu nhiên)
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)) 
             .httpBasic(httpBasic -> httpBasic.disable()) 
             .formLogin(formLogin -> formLogin.disable())
 
             .authorizeHttpRequests(authorize -> authorize
-                // --- PHÂN QUYỀN ---
-                // Cho phép các API này (Swagger, Auth)
                 .requestMatchers(
-                    "/api/v1/auth/**", // Bao gồm /login, /register, /forgot-password, /reset-password
+                    "/api/v1/auth/**",
                     "/api/v1/meetings/respond-by-link",
                     "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**"
                 ).permitAll()
                 
-                // Tất cả các API còn lại (như /api/v1/meetings)
-                .anyRequest().authenticated() // Đều phải được xác thực
+                // (API 'register' đã bị khóa, chỉ Admin gọi được)
+                .requestMatchers("/api/v1/auth/register").hasRole("ADMIN")
+                
+                .anyRequest().authenticated()
             );
         
-        // 5. Thêm "người gác cổng" JWT của chúng ta
-        // Nó phải chạy TRƯỚC filter UsernamePassword... của Spring
+        http.authenticationProvider(authenticationProvider());
         http.addFilterBefore(jwtAuthenticationFilter, 
                              UsernamePasswordAuthenticationFilter.class);
         
