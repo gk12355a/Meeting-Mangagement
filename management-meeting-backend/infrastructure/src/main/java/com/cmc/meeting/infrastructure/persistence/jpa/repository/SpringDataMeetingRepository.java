@@ -94,4 +94,6 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
        List<MeetingEntity> findMeetingsWithGuestsInDateRange(
                      @Param("from") LocalDateTime from,
                      @Param("to") LocalDateTime to);
+
+       boolean existsByOrganizerId(Long organizerId);
 }

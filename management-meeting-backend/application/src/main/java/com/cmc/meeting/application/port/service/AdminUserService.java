@@ -7,4 +7,5 @@ import java.util.List;
 public interface AdminUserService {
     List<AdminUserDTO> getAllUsers();
     AdminUserDTO updateUser(Long userId, AdminUserUpdateRequest request);
+    void deleteUser(Long userIdToDelete, Long currentAdminId);
 }

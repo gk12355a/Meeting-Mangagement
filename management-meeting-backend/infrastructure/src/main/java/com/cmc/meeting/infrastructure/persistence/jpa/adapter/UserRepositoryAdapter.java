@@ -53,4 +53,14 @@ public class UserRepositoryAdapter implements UserRepository {
                 .map(entity -> modelMapper.map(entity, User.class))
                 .collect(Collectors.toList());
     }
+    @Override
+    public void delete(User user) {
+        // Cần xóa các tham chiếu con trước (Contact Groups)
+        // (Nếu chúng ta không set CascadeType.DELETE)
+        // (Hiện tại, chúng ta sẽ giả định CSDL tự xử lý
+        // hoặc chúng ta sẽ xử lý ở Service)
+
+        UserEntity entity = modelMapper.map(user, UserEntity.class);
+        jpaRepository.delete(entity);
+    }
 }

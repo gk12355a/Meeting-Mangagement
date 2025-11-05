@@ -192,4 +192,8 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
                 .map(this::toDomain) // Dùng lại helper toDomain
                 .collect(Collectors.toList());
     }
+    @Override
+    public boolean existsByOrganizerId(Long organizerId) {
+        return jpaRepository.existsByOrganizerId(organizerId);
+    }
 }
