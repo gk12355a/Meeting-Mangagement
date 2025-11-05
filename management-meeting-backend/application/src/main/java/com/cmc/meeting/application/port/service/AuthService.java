@@ -4,6 +4,7 @@ import com.cmc.meeting.application.dto.auth.LoginRequest;
 import com.cmc.meeting.application.dto.auth.RegisterRequest;
 import com.cmc.meeting.application.dto.auth.ResetPasswordRequest;
 import com.cmc.meeting.application.dto.auth.AuthResponse;
+import com.cmc.meeting.application.dto.auth.ChangePasswordRequest;
 import com.cmc.meeting.application.dto.auth.ForgotPasswordRequest;
 
 public interface AuthService {
@@ -11,4 +12,5 @@ public interface AuthService {
     String register(RegisterRequest registerRequest);
     String forgotPassword(ForgotPasswordRequest request);
     String resetPassword(ResetPasswordRequest request);
+    void changePassword(Long currentUserId, ChangePasswordRequest request);
 }
