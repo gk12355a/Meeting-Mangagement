@@ -29,10 +29,6 @@
         <module>application</module>
         <module>infrastructure</module>
         <module>web</module>
-        <module>domain</module>
-        <module>application</module>
-        <module>infrastructure</module>
-        <module>web</module>
     </modules>
 
     <dependencyManagement>
