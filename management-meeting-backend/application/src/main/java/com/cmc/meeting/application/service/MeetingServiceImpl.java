@@ -12,6 +12,7 @@ import com.cmc.meeting.application.dto.timeslot.TimeSlotDTO;
 
 // Imports cho Ports (Hợp đồng)
 import com.cmc.meeting.application.port.service.MeetingService;
+import com.cmc.meeting.application.port.service.NotificationService;
 import com.cmc.meeting.domain.port.repository.DeviceRepository;
 import com.cmc.meeting.domain.port.repository.MeetingRepository;
 import com.cmc.meeting.domain.port.repository.RoomRepository;
@@ -57,19 +58,22 @@ public class MeetingServiceImpl implements MeetingService {
     private final ModelMapper modelMapper;
     private final ApplicationEventPublisher eventPublisher;
 
+    private final NotificationService notificationService;
+
     // Constructor Injection
     public MeetingServiceImpl(MeetingRepository meetingRepository,
             RoomRepository roomRepository,
             UserRepository userRepository,
             ModelMapper modelMapper,
             ApplicationEventPublisher eventPublisher,
-            DeviceRepository deviceRepository) {
+            DeviceRepository deviceRepository, NotificationService notificationService) {
         this.meetingRepository = meetingRepository;
         this.roomRepository = roomRepository;
         this.userRepository = userRepository;
         this.modelMapper = modelMapper;
         this.eventPublisher = eventPublisher;
         this.deviceRepository = deviceRepository;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -157,7 +161,20 @@ public class MeetingServiceImpl implements MeetingService {
         }
 
         meeting.cancelMeeting(request.getReason());
-        meetingRepository.save(meeting);
+        Meeting savedMeeting = meetingRepository.save(meeting);
+        
+        // BỔ SUNG: TẠO THÔNG BÁO IN-APP
+        String message = String.format(
+            "Cuộc họp '%s' (lúc %s) đã bị hủy.",
+            savedMeeting.getTitle(),
+            savedMeeting.getStartTime().toLocalDate()
+        );
+        // Gửi cho tất cả (trừ người hủy)
+        savedMeeting.getParticipants().stream()
+            .filter(p -> !p.getUser().getId().equals(currentUserId))
+            .forEach(p -> notificationService.createNotification(
+                p.getUser(), message, savedMeeting
+            ));
     }
 
     /**
@@ -273,7 +290,19 @@ public class MeetingServiceImpl implements MeetingService {
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy user"));
 
         meeting.respondToInvitation(currentUser, request.getStatus());
-        meetingRepository.save(meeting);
+        Meeting savedMeeting = meetingRepository.save(meeting);
+        
+        // BỔ SUNG: TẠO THÔNG BÁO IN-APP
+        // Gửi thông báo cho Người tổ chức (organizer)
+        String message = String.format(
+            "%s đã %s lời mời tham gia cuộc họp '%s'.",
+            currentUser.getFullName(),
+            request.getStatus() == ParticipantStatus.ACCEPTED ? "chấp nhận" : "từ chối",
+            savedMeeting.getTitle()
+        );
+        notificationService.createNotification(
+            savedMeeting.getOrganizer(), message, savedMeeting
+        );
     }
 
     /**
@@ -376,6 +405,18 @@ public class MeetingServiceImpl implements MeetingService {
 
         Meeting savedMeeting = meetingRepository.save(newMeeting);
         eventPublisher.publishEvent(new MeetingCreatedEvent(savedMeeting.getId()));
+
+        // BỔ SUNG: TẠO THÔNG BÁO IN-APP
+        String message = String.format(
+            "%s đã mời bạn tham gia cuộc họp: %s",
+            creator.getFullName(),
+            savedMeeting.getTitle()
+        );
+        savedMeeting.getParticipants().stream()
+            .filter(p -> p.getStatus() == ParticipantStatus.PENDING)
+            .forEach(p -> notificationService.createNotification(
+                p.getUser(), message, savedMeeting
+            ));
         return modelMapper.map(savedMeeting, MeetingDTO.class);
     }
 
