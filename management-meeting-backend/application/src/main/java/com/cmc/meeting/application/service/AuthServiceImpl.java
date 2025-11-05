@@ -2,6 +2,7 @@ package com.cmc.meeting.application.service;
 
 // DTOs
 import com.cmc.meeting.application.dto.auth.AuthResponse;
+import com.cmc.meeting.application.dto.auth.ChangePasswordRequest;
 import com.cmc.meeting.application.dto.auth.LoginRequest;
 import com.cmc.meeting.application.dto.auth.RegisterRequest;
 import com.cmc.meeting.application.dto.auth.ForgotPasswordRequest;
@@ -24,6 +25,7 @@ import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -169,5 +171,27 @@ public class AuthServiceImpl implements AuthService {
         passwordResetTokenRepository.delete(resetToken);
         
         return "Đặt lại mật khẩu thành công.";
+    }
+    @Override
+    @Transactional
+    public void changePassword(Long currentUserId, ChangePasswordRequest request) {
+        // 1. Lấy user
+        User user = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy user"));
+
+        // 2. KIỂM TRA MẬT KHẨU CŨ
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
+            // Dùng lỗi này để GlobalExceptionHandler trả về 401
+            throw new BadCredentialsException("Mật khẩu cũ không chính xác.");
+        }
+
+        // 3. (Tùy chọn) Kiểm tra mật khẩu mới không trùng mật khẩu cũ
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+            throw new IllegalArgumentException("Mật khẩu mới không được trùng với mật khẩu cũ.");
+        }
+
+        // 4. Băm và lưu mật khẩu mới
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
     }
 }

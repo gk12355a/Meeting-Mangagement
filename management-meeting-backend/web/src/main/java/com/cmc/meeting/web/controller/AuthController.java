@@ -1,17 +1,22 @@
 package com.cmc.meeting.web.controller;
 
 import com.cmc.meeting.application.dto.auth.AuthResponse;
+import com.cmc.meeting.application.dto.auth.ChangePasswordRequest;
 import com.cmc.meeting.application.dto.auth.ForgotPasswordRequest;
 import com.cmc.meeting.application.dto.auth.LoginRequest;
 import com.cmc.meeting.application.dto.auth.RegisterRequest;
 import com.cmc.meeting.application.dto.auth.ResetPasswordRequest;
 import com.cmc.meeting.application.port.service.AuthService;
+import com.cmc.meeting.domain.port.repository.UserRepository;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,9 +29,11 @@ public class AuthController {
 
     // Inject interface của Application Layer
     private final AuthService authService;
+    private final UserRepository userRepository;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, UserRepository userRepository) {
         this.authService = authService;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -86,5 +93,19 @@ public class AuthController {
             // Bắt lỗi (vd: Token hết hạn, Token không tồn tại)
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
+    }
+    @PostMapping("/change-password")
+    @Operation(summary = "Tự đổi mật khẩu (khi đã đăng nhập)")
+    public ResponseEntity<?> changePassword(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody ChangePasswordRequest request) {
+        
+        // Lấy ID user từ token
+        Long currentUserId = userRepository.findByUsername(userDetails.getUsername())
+                .orElseThrow(() -> new EntityNotFoundException("User không tồn tại từ token"))
+                .getId();
+        
+        authService.changePassword(currentUserId, request);
+        return ResponseEntity.ok("Đổi mật khẩu thành công.");
     }
 }
