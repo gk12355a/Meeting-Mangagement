@@ -53,7 +53,7 @@ public class EmailNotificationAdapter implements EmailNotificationPort {
     public void sendPasswordResetEmail(User user, String token) {
         try {
             String subject = "Yêu cầu Đặt lại Mật khẩu";
-            String frontendResetUrl = appConfigService.getValue("frontend.url", "http://localhost:3000"); // Lấy URL frontend
+            String frontendResetUrl = appConfigService.getValue("frontend.url", "http://localhost:5173"); // Lấy URL frontend
             String resetUrl = String.format("%s/reset-password?token=%s", frontendResetUrl, token);
 
             Map<String, Object> variables = new HashMap<>();
