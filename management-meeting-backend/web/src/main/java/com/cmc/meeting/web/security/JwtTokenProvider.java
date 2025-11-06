@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.util.Base64;
 import java.util.Date;
+import java.util.Set;
 
 @Component
 public class JwtTokenProvider implements TokenProvider{
@@ -44,14 +45,15 @@ public class JwtTokenProvider implements TokenProvider{
      * Subject (chủ thể) BÂY GIỜ LÀ USERNAME.
      */
     @Override
-    public String generateToken(Long userId, String username) { // Vẫn nhận vào cả 2
+    public String generateToken(Long userId, String username, Set<String> roles) { // Cập nhật tham số
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtConfig.getExpirationMs());
 
         // Tạo token
         return Jwts.builder()
-                .subject(username) // <-- THAY ĐỔI QUAN TRỌNG: Dùng username làm subject
-                .claim("userId", userId) // <-- Thêm userId như một claim
+                .subject(username) // Subject là username
+                .claim("userId", userId) // Thêm userId
+                .claim("roles", roles) // <-- BỔ SUNG QUAN TRỌNG
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(this.secretKey)
