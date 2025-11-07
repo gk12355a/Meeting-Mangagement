@@ -21,12 +21,12 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     private final UserRepository userRepository;
     private final ModelMapper modelMapper;
-private final MeetingRepository meetingRepository; // BỔ SUNG
+    private final MeetingRepository meetingRepository; // BỔ SUNG
 
     // CẬP NHẬT CONSTRUCTOR
-    public AdminUserServiceImpl(UserRepository userRepository, 
-                                ModelMapper modelMapper, 
-                                MeetingRepository meetingRepository) { // Bổ sung
+    public AdminUserServiceImpl(UserRepository userRepository,
+            ModelMapper modelMapper,
+            MeetingRepository meetingRepository) { // Bổ sung
         this.userRepository = userRepository;
         this.modelMapper = modelMapper;
         this.meetingRepository = meetingRepository; // Bổ sung
@@ -37,14 +37,14 @@ private final MeetingRepository meetingRepository; // BỔ SUNG
     public List<AdminUserDTO> getAllUsers() {
         List<User> users = userRepository.findAll();
         return users.stream()
-            .map(user -> modelMapper.map(user, AdminUserDTO.class))
-            .collect(Collectors.toList());
+                .map(user -> modelMapper.map(user, AdminUserDTO.class))
+                .collect(Collectors.toList());
     }
 
     @Override
     public AdminUserDTO updateUser(Long userId, AdminUserUpdateRequest request) {
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy user: " + userId));
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy user: " + userId));
 
         // Cập nhật quyền và trạng thái
         user.setRoles(request.getRoles());
@@ -53,6 +53,7 @@ private final MeetingRepository meetingRepository; // BỔ SUNG
         User updatedUser = userRepository.save(user);
         return modelMapper.map(updatedUser, AdminUserDTO.class);
     }
+
     // BỔ SUNG: (US-18)
     @Override
     public void deleteUser(Long userIdToDelete, Long currentAdminId) {
@@ -62,7 +63,7 @@ private final MeetingRepository meetingRepository; // BỔ SUNG
         }
 
         User userToDelete = userRepository.findById(userIdToDelete)
-            .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy user: " + userIdToDelete));
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy user: " + userIdToDelete));
 
         // 2. Kiểm tra an toàn: Không thể xóa Admin cuối cùng
         if (userToDelete.getRoles().contains(Role.ROLE_ADMIN)) {
@@ -76,7 +77,8 @@ private final MeetingRepository meetingRepository; // BỔ SUNG
 
         // 3. Kiểm tra ràng buộc: Không thể xóa người đang tổ chức họp
         if (meetingRepository.existsByOrganizerId(userIdToDelete)) {
-            throw new PolicyViolationException("Không thể xóa user vì họ đang tổ chức các cuộc họp. Vui lòng gán lại các cuộc họp đó trước.");
+            throw new PolicyViolationException(
+                    "Không thể xóa user vì họ đang tổ chức các cuộc họp. Vui lòng gán lại các cuộc họp đó trước.");
         }
 
         // 4. (Xử lý nâng cao): Xóa các ràng buộc khóa ngoại (Foreign Key)
