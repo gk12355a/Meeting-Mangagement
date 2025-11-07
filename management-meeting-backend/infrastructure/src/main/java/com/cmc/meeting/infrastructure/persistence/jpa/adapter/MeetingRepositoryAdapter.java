@@ -15,6 +15,8 @@ import jakarta.annotation.PostConstruct;
 // Bỏ: @PostConstruct
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeMap;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 // Bỏ: TypeMap
 import org.springframework.stereotype.Repository;
 
@@ -195,5 +197,19 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
     @Override
     public boolean existsByOrganizerId(Long organizerId) {
         return jpaRepository.existsByOrganizerId(organizerId);
+    }
+    // CẬP NHẬT: (US-6)
+    @Override
+    public Page<Meeting> findAllByUserId(Long userId, Pageable pageable) {
+        Page<MeetingEntity> page = jpaRepository.findMyMeetings(userId, pageable);
+        return page.map(this::toDomain); // Dùng helper toDomain
+    }
+
+    // CẬP NHẬT: (US-5)
+    @Override
+    public List<Meeting> findConflictingMeetingsForUsers(Set<Long> userIds, LocalDateTime from, LocalDateTime to) {
+        return jpaRepository.findConflictingMeetingsForUsers(userIds, from, to).stream()
+                .map(this::toDomain)
+                .collect(Collectors.toList());
     }
 }

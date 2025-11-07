@@ -30,6 +30,8 @@ import org.modelmapper.ModelMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -456,7 +458,7 @@ public class MeetingServiceImpl implements MeetingService {
         userIdsToCheck.add(organizer.getId()); // Thêm cả organizer vào danh sách check
 
         List<Meeting> conflictingUserMeetings = meetingRepository
-                .findMeetingsForUsersInDateRange(userIdsToCheck, startTime, endTime);
+                .findConflictingMeetingsForUsers(userIdsToCheck, startTime, endTime);
 
         if (!conflictingUserMeetings.isEmpty()) {
             // Tìm xem ai là người bị trùng
@@ -533,6 +535,13 @@ public class MeetingServiceImpl implements MeetingService {
         // (createMeeting sẽ tự kiểm tra xung đột mới)
         log.info("-> (Update) Đang tạo chuỗi họp mới thay thế...");
         return this.createMeeting(request, currentUserId);
+    }
+    // CẬP NHẬT: (US-6)
+    @Override
+    @Transactional(readOnly = true)
+    public Page<MeetingDTO> getMyMeetings(Long currentUserId, Pageable pageable) {
+        Page<Meeting> meetings = meetingRepository.findAllByUserId(currentUserId, pageable);
+        return meetings.map(meeting -> modelMapper.map(meeting, MeetingDTO.class));
     }
 
 }

@@ -2,6 +2,9 @@ package com.cmc.meeting.application.port.service;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import com.cmc.meeting.application.dto.meeting.CheckInRequest;
 import com.cmc.meeting.application.dto.meeting.MeetingCancelRequest;
 import com.cmc.meeting.application.dto.meeting.MeetingResponseRequest;
@@ -29,4 +32,6 @@ public interface MeetingService {
     void cancelMeetingSeries(String seriesId, MeetingCancelRequest request, Long currentUserId);
     // BỔ SUNG: (BS-2.1)
     MeetingDTO updateMeetingSeries(String seriesId, MeetingCreationRequest request, Long currentUserId);
+    // CẬP NHẬT: (US-6) Thêm Pageable
+    Page<MeetingDTO> getMyMeetings(Long currentUserId, Pageable pageable);
 }

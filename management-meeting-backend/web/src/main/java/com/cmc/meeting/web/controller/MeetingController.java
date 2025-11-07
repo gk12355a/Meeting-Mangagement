@@ -13,10 +13,16 @@ import com.cmc.meeting.domain.model.User;
 import com.cmc.meeting.domain.port.repository.UserRepository;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+
+import org.springframework.data.domain.Sort;
 // -------------------------
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -105,16 +111,17 @@ public class MeetingController {
          * (Các cuộc họp tôi tổ chức HOẶC được mời)
          */
         @GetMapping("/my-meetings")
-        @Operation(summary = "Lấy danh sách các cuộc họp của tôi (tổ chức hoặc tham dự)")
-        public ResponseEntity<List<MeetingDTO>> getMyMeetings(
-                        @AuthenticationPrincipal UserDetails userDetails) {
+        @Operation(summary = "Lấy danh sách các cuộc họp của tôi (có phân trang)")
+        public ResponseEntity<Page<MeetingDTO>> getMyMeetings(
+                        @AuthenticationPrincipal UserDetails userDetails,
+                        @PageableDefault(size = 20, sort = "startTime", direction = Sort.Direction.DESC) Pageable pageable) {
 
                 // 1. Lấy ID user từ token
                 com.cmc.meeting.domain.model.User currentUser = userRepository.findByUsername(userDetails.getUsername())
                                 .orElseThrow(() -> new RuntimeException("Lỗi: Không tìm thấy user từ token"));
 
                 // 2. Gọi service
-                List<MeetingDTO> meetings = meetingService.getMyMeetings(currentUser.getId());
+                Page<MeetingDTO> meetings = meetingService.getMyMeetings(currentUser.getId(), pageable);
 
                 return ResponseEntity.ok(meetings); // 200 OK
         }

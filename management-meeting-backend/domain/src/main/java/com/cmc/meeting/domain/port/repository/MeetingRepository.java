@@ -7,6 +7,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 // Đây là "Hợp đồng" (Contract)
 // Nó không biết gì về JPA hay MyBatiS
 public interface MeetingRepository {
@@ -28,4 +31,6 @@ public interface MeetingRepository {
     List<Meeting> findAllBySeriesId(String seriesId);
     List<Meeting> findMeetingsWithGuestsInDateRange(LocalDateTime from, LocalDateTime to);
     boolean existsByOrganizerId(Long organizerId);
+    Page<Meeting> findAllByUserId(Long userId, Pageable pageable);
+    List<Meeting> findConflictingMeetingsForUsers(Set<Long> userIds, LocalDateTime from, LocalDateTime to);
 }

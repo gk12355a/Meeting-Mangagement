@@ -1,6 +1,9 @@
 package com.cmc.meeting.infrastructure.persistence.jpa.repository;
 
 import com.cmc.meeting.infrastructure.persistence.jpa.entity.MeetingEntity;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,6 +14,23 @@ import java.util.Optional;
 import java.util.Set;
 
 public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity, Long> {
+
+       // CẬP NHẬT: (US-6) Thêm Pageable, đổi tên
+       @Query("SELECT m FROM MeetingEntity m " +
+                     "LEFT JOIN m.participants p " +
+                     "WHERE m.organizer.id = :userId OR p.userId = :userId " +
+                     "ORDER BY m.startTime DESC") // Sắp xếp theo ngày mới nhất
+       Page<MeetingEntity> findMyMeetings(Long userId, Pageable pageable);
+
+       // CẬP NHẬT: (US-5)
+       @Query("SELECT DISTINCT m FROM MeetingEntity m JOIN m.participants p " +
+                     "WHERE m.status = 'CONFIRMED' " +
+                     "AND m.startTime < :to AND m.endTime > :from " +
+                     "AND (p.userId IN :userIds OR m.organizer.id IN :userIds)") // Sửa: check cả organizer
+       List<MeetingEntity> findConflictingMeetingsForUsers(
+                     @Param("userIds") Set<Long> userIds,
+                     @Param("from") LocalDateTime from,
+                     @Param("to") LocalDateTime to);
 
        /**
         * Hiện thực logic kiểm tra trùng lịch (isRoomBusy)

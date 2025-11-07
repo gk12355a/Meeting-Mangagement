@@ -28,4 +28,9 @@ public class NotificationEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "meeting_id") // Có thể null
     private MeetingEntity meeting; // Link tới cuộc họp
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
 }
