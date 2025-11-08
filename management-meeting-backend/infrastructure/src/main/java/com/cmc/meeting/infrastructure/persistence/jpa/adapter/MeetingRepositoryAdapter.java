@@ -212,4 +212,9 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
                 .map(this::toDomain)
                 .collect(Collectors.toList());
     }
+    @Override
+    public Set<Long> findBookedDevicesInTimeRange(LocalDateTime startTime, LocalDateTime endTime) {
+        // Chỉ cần gọi thẳng hàm của JPA Repo
+        return jpaRepository.findBookedDeviceIdsInTimeRange(startTime, endTime);
+    }
 }

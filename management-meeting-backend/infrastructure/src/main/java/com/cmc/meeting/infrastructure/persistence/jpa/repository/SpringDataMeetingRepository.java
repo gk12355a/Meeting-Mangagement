@@ -116,4 +116,12 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
                      @Param("to") LocalDateTime to);
 
        boolean existsByOrganizerId(Long organizerId);
+
+       @Query("SELECT d.id FROM MeetingEntity m JOIN m.devices d " +
+                     "WHERE m.status != 'CANCELED' " + // Chỉ check các cuộc họp không bị hủy
+                     "AND m.startTime < :endTime " + // Logic kiểm tra chồng lấn
+                     "AND m.endTime > :startTime") // Logic kiểm tra chồng lấn
+       Set<Long> findBookedDeviceIdsInTimeRange(
+                     @Param("startTime") LocalDateTime startTime,
+                     @Param("endTime") LocalDateTime endTime);
 }
