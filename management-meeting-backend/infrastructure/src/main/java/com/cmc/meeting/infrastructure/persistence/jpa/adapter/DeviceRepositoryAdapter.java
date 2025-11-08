@@ -1,6 +1,7 @@
 package com.cmc.meeting.infrastructure.persistence.jpa.adapter;
 
 import com.cmc.meeting.domain.model.Device;
+import com.cmc.meeting.domain.model.DeviceStatus;
 import com.cmc.meeting.domain.port.repository.DeviceRepository;
 import com.cmc.meeting.infrastructure.persistence.jpa.entity.DeviceEntity;
 import com.cmc.meeting.infrastructure.persistence.jpa.repository.SpringDataDeviceRepository;
@@ -45,5 +46,15 @@ public class DeviceRepositoryAdapter implements DeviceRepository {
     @Override
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);
+    }
+    @Override
+    public List<Device> findAllByStatus(DeviceStatus status) {
+        // Gọi hàm JPA repo
+        List<DeviceEntity> entities = jpaRepository.findAllByStatus(status);
+        
+        // Map từ List<Entity> sang List<Domain Model>
+        return entities.stream()
+                .map(entity -> modelMapper.map(entity, Device.class))
+                .collect(Collectors.toList());
     }
 }
