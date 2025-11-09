@@ -32,6 +32,7 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     public void createNotification(User user, String message, Meeting meeting) {
         Notification notification = new Notification(message, user, meeting);
+        // Lỗi 'read: false' đã được sửa ở file Notification.java
         notificationRepository.save(notification);
     }
 
@@ -40,7 +41,10 @@ public class NotificationServiceImpl implements NotificationService {
     @Transactional(readOnly = true)
     public Page<NotificationDTO> getMyNotifications(Long currentUserId, Pageable pageable) {
         Page<Notification> page = notificationRepository.findByUserIdOrderByCreatedAtDesc(currentUserId, pageable);
-        return page.map(notification -> modelMapper.map(notification, NotificationDTO.class));
+        
+        // SỬA LỖI [meetingId: null]:
+        // Chúng ta map thủ công qua một hàm helper để đảm bảo meetingId được gán
+        return page.map(this::convertNotificationToDTO);
     }
 
     // Đếm số lượng chưa đọc
@@ -57,7 +61,9 @@ public class NotificationServiceImpl implements NotificationService {
         Notification notification = findNotification(notificationId, currentUserId);
         notification.setRead(true);
         Notification saved = notificationRepository.save(notification);
-        return modelMapper.map(saved, NotificationDTO.class);
+        
+        // Dùng hàm helper mới để đảm bảo map dữ liệu chính xác
+        return convertNotificationToDTO(saved);
     }
 
     // Đánh dấu tất cả đã đọc
@@ -75,5 +81,26 @@ public class NotificationServiceImpl implements NotificationService {
             throw new PolicyViolationException("Bạn không có quyền xem thông báo này.");
         }
         return notification;
+    }
+    
+    // ==========================================================
+    // HÀM HELPER MỚI (ĐỂ SỬA LỖI)
+    // ==========================================================
+    /**
+     * Ánh xạ (map) từ Notification (Domain) sang NotificationDTO (Data Transfer)
+     * Đảm bảo meetingId được gán chính xác.
+     */
+    private NotificationDTO convertNotificationToDTO(Notification notification) {
+        // 1. Dùng ModelMapper để map các trường cơ bản (id, message, read, createdAt)
+        NotificationDTO dto = modelMapper.map(notification, NotificationDTO.class);
+        
+        // 2. SỬA LỖI: Gán meetingId thủ công
+        // Lấy đối tượng Meeting từ Notification và lấy ID của nó
+        if (notification.getMeeting() != null) {
+            dto.setMeetingId(notification.getMeeting().getId());
+        }
+        // (Nếu notification.getMeeting() là null, meetingId của DTO sẽ tự động là null)
+        
+        return dto;
     }
 }
