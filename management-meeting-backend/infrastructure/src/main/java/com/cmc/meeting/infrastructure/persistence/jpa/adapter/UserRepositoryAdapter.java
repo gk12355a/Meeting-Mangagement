@@ -63,4 +63,13 @@ public class UserRepositoryAdapter implements UserRepository {
         UserEntity entity = modelMapper.map(user, UserEntity.class);
         jpaRepository.delete(entity);
     }
+    @Override
+    public List<User> searchByNameOrUsername(String query) {
+        List<UserEntity> entities = jpaRepository.searchByNameOrUsername(query);
+        
+        // Map từ List<Entity> sang List<Domain Model>
+        return entities.stream()
+                .map(entity -> modelMapper.map(entity, User.class))
+                .collect(Collectors.toList());
+    }
 }

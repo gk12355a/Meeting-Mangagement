@@ -12,4 +12,5 @@ public interface UserRepository {
     User save(User user);
     List<User> findAll();
     void delete(User user);
+    List<User> searchByNameOrUsername(String query);
 }
