@@ -34,4 +34,5 @@ public interface MeetingRepository {
     Page<Meeting> findAllByUserId(Long userId, Pageable pageable);
     List<Meeting> findConflictingMeetingsForUsers(Set<Long> userIds, LocalDateTime from, LocalDateTime to);
     Set<Long> findBookedDevicesInTimeRange(LocalDateTime startTime, LocalDateTime endTime);
+    Page<Meeting> findAllMeetings(Pageable pageable);
 }

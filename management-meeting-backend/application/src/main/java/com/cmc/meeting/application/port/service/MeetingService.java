@@ -34,4 +34,5 @@ public interface MeetingService {
     MeetingDTO updateMeetingSeries(String seriesId, MeetingCreationRequest request, Long currentUserId);
     // CẬP NHẬT: (US-6) Thêm Pageable
     Page<MeetingDTO> getMyMeetings(Long currentUserId, Pageable pageable);
+    Page<MeetingDTO> getAllMeetings(Pageable pageable);
 }

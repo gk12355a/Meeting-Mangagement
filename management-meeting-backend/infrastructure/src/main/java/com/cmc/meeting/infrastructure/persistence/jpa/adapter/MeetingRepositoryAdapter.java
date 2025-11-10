@@ -217,4 +217,12 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
         // Chỉ cần gọi thẳng hàm của JPA Repo
         return jpaRepository.findBookedDeviceIdsInTimeRange(startTime, endTime);
     }
+    @Override
+    public Page<Meeting> findAllMeetings(Pageable pageable) {
+        // 1. Gọi hàm JPA mới
+        Page<MeetingEntity> page = jpaRepository.findAllByOrderByStartTimeDesc(pageable);
+        
+        // 2. Map Entity Page -> Domain Model Page
+        return page.map(entity -> modelMapper.map(entity, Meeting.class));
+    }
 }

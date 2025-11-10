@@ -3,7 +3,9 @@ package com.cmc.meeting.web.controller;
 import com.cmc.meeting.application.dto.report.CancelationReportDTO;
 import com.cmc.meeting.application.dto.report.RoomUsageReportDTO;
 import com.cmc.meeting.application.dto.report.VisitorReportDTO;
+import com.cmc.meeting.application.dto.response.MeetingDTO;
 import com.cmc.meeting.application.port.service.ExcelExportService;
+import com.cmc.meeting.application.port.service.MeetingService;
 import com.cmc.meeting.application.port.service.ReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -18,11 +20,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
+import org.springframework.data.domain.Pageable;
 import java.io.ByteArrayInputStream;
 import java.time.LocalDate;
 import java.util.List;
-
+import org.springframework.data.domain.Page;
 @RestController
 @RequestMapping("/api/v1/reports")
 @Tag(name = "Report API", description = "API Thống kê & Báo cáo (Chỉ Admin)")
@@ -32,11 +34,13 @@ public class ReportController {
 
     private final ReportService reportService;
     private final ExcelExportService excelExportService;
+    private final MeetingService meetingService;
 
     public ReportController(ReportService reportService, 
-                            ExcelExportService excelExportService) {
+                            ExcelExportService excelExportService, MeetingService meetingService) {
         this.reportService = reportService;
         this.excelExportService = excelExportService; // BỔ SUNG
+        this.meetingService = meetingService;
     }
 
     @GetMapping("/room-usage")
@@ -106,5 +110,10 @@ public class ReportController {
 
         List<VisitorReportDTO> report = reportService.getVisitorReport(date);
         return ResponseEntity.ok(report);
+    }
+    @GetMapping("/all-meetings")
+    public ResponseEntity<Page<MeetingDTO>> getAllMeetings(Pageable pageable) {
+        Page<MeetingDTO> meetings = meetingService.getAllMeetings(pageable);
+        return ResponseEntity.ok(meetings);
     }
 }

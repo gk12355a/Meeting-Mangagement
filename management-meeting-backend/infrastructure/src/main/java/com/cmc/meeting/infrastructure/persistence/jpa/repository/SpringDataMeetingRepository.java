@@ -124,4 +124,5 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
        Set<Long> findBookedDeviceIdsInTimeRange(
                      @Param("startTime") LocalDateTime startTime,
                      @Param("endTime") LocalDateTime endTime);
+       Page<MeetingEntity> findAllByOrderByStartTimeDesc(Pageable pageable);
 }

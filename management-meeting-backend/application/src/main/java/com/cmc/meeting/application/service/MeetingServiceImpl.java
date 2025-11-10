@@ -543,5 +543,18 @@ public class MeetingServiceImpl implements MeetingService {
         Page<Meeting> meetings = meetingRepository.findAllByUserId(currentUserId, pageable);
         return meetings.map(meeting -> modelMapper.map(meeting, MeetingDTO.class));
     }
+    @Override
+    @Transactional(readOnly = true)
+    public Page<MeetingDTO> getAllMeetings(Pageable pageable) {
+        
+        // 1. Gọi hàm mới từ Repository Port
+        Page<Meeting> meetingsPage = meetingRepository.findAllMeetings(pageable);
+        
+        // 2. Ánh xạ (map) sang DTO
+        // (Nếu bạn có hàm helper convertToDTO, hãy dùng nó)
+        return meetingsPage.map(meeting -> 
+            modelMapper.map(meeting, MeetingDTO.class)
+        );
+    }
 
 }
