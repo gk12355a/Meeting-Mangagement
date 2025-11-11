@@ -59,7 +59,7 @@ public class AuthController {
             return ResponseEntity.ok(message); // Trả về 200 OK
         } catch (RuntimeException ex) {
             // Xử lý lỗi (vd: username đã tồn tại)
-            // (GlobalExceptionHandler cũng sẽ bắt lỗi này)
+            // GlobalExceptionHandler cũng sẽ bắt lỗi này)
             return ResponseEntity
                     .status(HttpStatus.BAD_REQUEST)
                     .body(ex.getMessage()); // Trả về 400
@@ -90,7 +90,7 @@ public class AuthController {
             String message = authService.resetPassword(request);
             return ResponseEntity.ok(message);
         } catch (Exception e) {
-            // Bắt lỗi (vd: Token hết hạn, Token không tồn tại)
+            // Bắt lỗi (VD: Token hết hạn, Token không tồn tại)
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
