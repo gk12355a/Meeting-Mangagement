@@ -6,6 +6,6 @@ import lombok.Data;
 @Data
 public class CheckInRequest {
 
-    @NotNull(message = "Room ID không được null ")
+    @NotNull(message = "Room ID không được để trống")
     private Long roomId;
 }
