@@ -1,15 +1,19 @@
 package com.cmc.meeting.web.controller;
 
+import com.cmc.meeting.application.dto.request.UserProfileUpdateRequest;
 import com.cmc.meeting.application.dto.response.UserDTO; // Dùng DTO đơn giản
 import com.cmc.meeting.application.port.service.UserService; // Service mới
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
+import org.springframework.security.core.Authentication; // <-- IMPORT MỚI
+import org.springframework.web.bind.annotation.*; // <-- IMPORT MỚI
 import java.util.List;
 
 @RestController
@@ -31,5 +35,17 @@ public class UserController {
     public ResponseEntity<List<UserDTO>> searchUsers(@RequestParam String query) {
         List<UserDTO> users = userService.searchUsers(query);
         return ResponseEntity.ok(users);
+    }
+    @PutMapping("/profile")
+    @PreAuthorize("hasRole('USER')") // Yêu cầu đã đăng nhập
+    public ResponseEntity<UserDTO> updateUserProfile(
+            @RequestBody UserProfileUpdateRequest request,
+            Authentication authentication) {
+        
+        // Lấy username (email) từ token
+        String currentUsername = ((UserDetails) authentication.getPrincipal()).getUsername();
+        
+        UserDTO updatedUser = userService.updateUserProfile(currentUsername, request);
+        return ResponseEntity.ok(updatedUser);
     }
 }
