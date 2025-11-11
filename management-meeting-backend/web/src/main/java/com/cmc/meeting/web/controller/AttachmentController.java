@@ -21,7 +21,7 @@ import java.io.IOException;
 @RequestMapping("/api/v1/attachments")
 @Tag(name = "Attachment API", description = "API upload/xóa file đính kèm (BS-4.1)")
 @SecurityRequirement(name = "bearerAuth")
-@PreAuthorize("isAuthenticated()") // Chỉ cần đăng nhập
+@PreAuthorize("isAuthenticated()") //Chỉ cần đăng nhập
 public class AttachmentController {
 
     private final AttachmentService attachmentService;
