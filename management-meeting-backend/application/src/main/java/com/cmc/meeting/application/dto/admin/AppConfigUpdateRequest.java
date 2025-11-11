@@ -6,6 +6,6 @@ import lombok.Data;
 @Data
 public class AppConfigUpdateRequest {
     // Admin chỉ được sửa 'value', không được sửa 'key'
-    @NotBlank(message = "Giá trị cấu hình không bỏ trống")
+    @NotBlank(message = "Giá trị cấu hình không được để trống")
     private String configValue;
 }
