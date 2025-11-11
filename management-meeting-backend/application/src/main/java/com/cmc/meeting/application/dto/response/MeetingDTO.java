@@ -5,6 +5,7 @@ import com.cmc.meeting.domain.model.BookingStatus;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 
 @Data
@@ -21,7 +22,7 @@ public class MeetingDTO {
     private RoomDTO room;
     private UserDTO creator;
     private UserDTO organizer;
-    private Set<UserDTO> participants;
+    private List<MeetingParticipantDTO> participants;
 
     // ----- Các DTO lồng nhau (Nested DTOs) -----
     // (Để đơn giản, chúng ta định nghĩa tạm ở đây)
