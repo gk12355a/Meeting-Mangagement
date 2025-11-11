@@ -5,6 +5,7 @@ import com.cmc.meeting.application.port.service.UserService; // Service mới
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -14,7 +15,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.cmc.meeting.application.dto.request.UserProfileUpdateRequest;
 import java.util.List;
-import jakarta.persistence.EntityNotFoundException;
 @RestController
 @RequestMapping("/api/v1/users") // Endpoint mới, không có /admin
 public class UserController {
