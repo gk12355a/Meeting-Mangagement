@@ -9,7 +9,7 @@ import com.cmc.meeting.application.dto.response.MeetingDTO;
 import com.cmc.meeting.application.port.service.MeetingService;
 import com.cmc.meeting.domain.model.ParticipantStatus;
 import com.cmc.meeting.domain.model.User;
-// BỔ SUNG: Import 2 thư viện này
+
 import com.cmc.meeting.domain.port.repository.UserRepository;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
