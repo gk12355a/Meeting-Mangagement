@@ -8,7 +8,6 @@ import com.cmc.meeting.application.dto.auth.RegisterRequest;
 import com.cmc.meeting.application.dto.auth.ResetPasswordRequest;
 import com.cmc.meeting.application.port.service.AuthService;
 import com.cmc.meeting.domain.port.repository.UserRepository;
-
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.persistence.EntityNotFoundException;
