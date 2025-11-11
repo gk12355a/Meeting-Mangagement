@@ -59,7 +59,7 @@ public class AdminUserServiceImpl implements AdminUserService {
     public void deleteUser(Long userIdToDelete, Long currentAdminId) {
         // 1. Kiểm tra an toàn: Không thể tự xóa chính mình
         if (userIdToDelete.equals(currentAdminId)) {
-            throw new PolicyViolationException("Admin không thể tự xóa");
+            throw new PolicyViolationException("Admin không thể tự xóa chính mình.");
         }
 
         User userToDelete = userRepository.findById(userIdToDelete)
