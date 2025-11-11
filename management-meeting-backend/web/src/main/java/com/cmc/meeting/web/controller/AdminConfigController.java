@@ -15,7 +15,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/admin/configs")
-@Tag(name = "Admin: System Configuration API", description = "API cho Admin quản lý cấu hình")
+@Tag(name = "Admin: System Configuration API", description = "API cho Admin quản lý cấu hình (BS-33)")
 @SecurityRequirement(name = "bearerAuth")
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminConfigController {
