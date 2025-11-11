@@ -125,26 +125,44 @@ public class AuthServiceImpl implements AuthService {
      * (BS-5.1 & 5.2) Yêu cầu Đặt lại Mật khẩu & Gửi Mail
      */
     @Override
+    @Transactional // Đảm bảo tất cả các thao tác (xóa + thêm) là một giao dịch
     public String forgotPassword(ForgotPasswordRequest request) {
         Optional<User> userOpt = userRepository.findByUsername(request.getEmail());
 
         if (userOpt.isEmpty()) {
-            // Không bao giờ báo "Không tìm thấy email" (vì lý do bảo mật)
             log.warn("Yêu cầu reset mật khẩu cho email không tồn tại: {}", request.getEmail());
             return "Nếu email tồn tại, bạn sẽ nhận được link đặt lại mật khẩu.";
         }
 
         User user = userOpt.get();
 
-        // 2. Tạo Token
+        // ==========================================================
+        // BẮT ĐẦU SỬA LỖI (Check và Xóa token cũ)
+        // ==========================================================
+
+        // 1. Tìm xem user này đã có token nào chưa
+        Optional<PasswordResetToken> existingToken = passwordResetTokenRepository.findByUser(user);
+        
+        // 2. Nếu có, HÃY XÓA NÓ ĐI
+        if (existingToken.isPresent()) {
+            log.info("Tìm thấy token cũ cho user {}. Đang xóa...", user.getUsername());
+            passwordResetTokenRepository.delete(existingToken.get());
+        }
+        
+        // ==========================================================
+        // KẾT THÚC SỬA LỖI
+        // ==========================================================
+
+        // 3. Tạo Token mới (Logic cũ của bạn)
         String token = UUID.randomUUID().toString();
         LocalDateTime expiryDate = LocalDateTime.now().plusMinutes(15); // Hết hạn sau 15p
 
         PasswordResetToken resetToken = new PasswordResetToken(token, user, expiryDate);
+        
+        // 4. Lưu token MỚI (Bây giờ sẽ không bao giờ bị trùng)
         passwordResetTokenRepository.save(resetToken);
 
-        // 3. Gửi Mail (Gọi Port)
-        // (Adapter ở infrastructure sẽ lo việc tạo HTML và gửi)
+        // 5. Gửi Mail (Logic cũ của bạn)
         emailSender.sendPasswordResetEmail(user, token);
 
         return "Nếu email tồn tại, bạn sẽ nhận được link đặt lại mật khẩu.";
