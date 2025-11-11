@@ -46,7 +46,7 @@ public class AdminUserController {
             @Valid @RequestBody AdminUserUpdateRequest request) {
         return ResponseEntity.ok(adminUserService.updateUser(id, request));
     }
-    // BỔ SUNG (US-18)
+    // BỔ SUNG (US-18):
     @DeleteMapping("/{id}")
     @Operation(summary = "Xóa một user (Admin only)")
     public ResponseEntity<?> deleteUser(
