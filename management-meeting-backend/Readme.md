@@ -138,3 +138,6 @@ Bộ **Test Plan** này bao phủ toàn bộ hệ thống backend từ xác th�
 Hãy chạy tuần tự theo thứ tự Epic để đảm bảo dữ liệu nhất quán và kết quả chính xác nhất.
 
 > 💡 Nếu cần, bạn có thể tạo thêm file `postman_collection.json` để tự động hóa toàn bộ quy trình test này.
+
+mvn clean install -DskipTests 
+java -jar web/target/web-1.0.0-SNAPSHOT.jar
