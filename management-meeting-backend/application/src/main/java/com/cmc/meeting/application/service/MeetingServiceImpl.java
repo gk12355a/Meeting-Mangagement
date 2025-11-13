@@ -7,6 +7,7 @@ import com.cmc.meeting.application.dto.meeting.MeetingResponseRequest;
 import com.cmc.meeting.application.dto.request.MeetingCreationRequest;
 import com.cmc.meeting.application.dto.request.MeetingUpdateRequest;
 import com.cmc.meeting.application.dto.response.MeetingDTO;
+import com.cmc.meeting.application.dto.response.MeetingParticipantDTO;
 import com.cmc.meeting.application.dto.recurrence.RecurrenceRuleDTO;
 import com.cmc.meeting.application.dto.timeslot.TimeSlotDTO;
 
@@ -240,7 +241,7 @@ public class MeetingServiceImpl implements MeetingService {
         meeting.setGuestEmails(newGuestEmails);
 
         Meeting updatedMeeting = meetingRepository.save(meeting);
-        return modelMapper.map(updatedMeeting, MeetingDTO.class);
+        return convertMeetingToDTO(updatedMeeting);
     }
 
     /**
@@ -261,7 +262,7 @@ public class MeetingServiceImpl implements MeetingService {
             throw new PolicyViolationException("Bạn không có quyền xem chi tiết cuộc họp này.");
         }
 
-        return modelMapper.map(meeting, MeetingDTO.class);
+        return convertMeetingToDTO(meeting);
     }
 
     /**
@@ -272,7 +273,7 @@ public class MeetingServiceImpl implements MeetingService {
     public List<MeetingDTO> getMyMeetings(Long currentUserId) {
         List<Meeting> meetings = meetingRepository.findAllByUserId(currentUserId);
         return meetings.stream()
-                .map(meeting -> modelMapper.map(meeting, MeetingDTO.class))
+                .map(this::convertMeetingToDTO)
                 .collect(Collectors.toList());
     }
 
@@ -419,7 +420,7 @@ public class MeetingServiceImpl implements MeetingService {
             .forEach(p -> notificationService.createNotification(
                 p.getUser(), message, savedMeeting
             ));
-        return modelMapper.map(savedMeeting, MeetingDTO.class);
+        return convertMeetingToDTO(savedMeeting);
     }
 
     /**
@@ -500,7 +501,7 @@ public class MeetingServiceImpl implements MeetingService {
                     break;
             }
         }
-        return slots;
+        return new ArrayList<>();
     }
 
     // BỔ SUNG: (BS-2.1)
@@ -541,7 +542,7 @@ public class MeetingServiceImpl implements MeetingService {
     @Transactional(readOnly = true)
     public Page<MeetingDTO> getMyMeetings(Long currentUserId, Pageable pageable) {
         Page<Meeting> meetings = meetingRepository.findAllByUserId(currentUserId, pageable);
-        return meetings.map(meeting -> modelMapper.map(meeting, MeetingDTO.class));
+        return meetings.map(this::convertMeetingToDTO);
     }
     @Override
     @Transactional(readOnly = true)
@@ -552,9 +553,50 @@ public class MeetingServiceImpl implements MeetingService {
         
         // 2. Ánh xạ (map) sang DTO
         // (Nếu bạn có hàm helper convertToDTO, hãy dùng nó)
-        return meetingsPage.map(meeting -> 
-            modelMapper.map(meeting, MeetingDTO.class)
-        );
+        return meetingsPage.map(this::convertMeetingToDTO);
+    }
+    /**
+     * Ánh xạ (map) từ Meeting (Domain) sang MeetingDTO
+     * Sửa lỗi thiếu 'status' của 'participants'.
+     */
+    private MeetingDTO convertMeetingToDTO(Meeting meeting) {
+        if (meeting == null) {
+            return null;
+        }
+
+        // 1. Ánh xạ các trường đơn giản (id, title, room, devices, ...)
+        // ModelMapper sẽ tự động map các trường lồng như RoomDTO, UserDTO, DeviceDTO
+        MeetingDTO dto = modelMapper.map(meeting, MeetingDTO.class);
+
+        // 2. Ánh xạ 'participants' thủ công (PHẦN SỬA LỖI)
+        if (meeting.getParticipants() != null) {
+            List<MeetingParticipantDTO> participantDTOs = meeting.getParticipants().stream()
+                .map(this::convertParticipantToDTO) // Gọi hàm helper con
+                .collect(Collectors.toList());
+            dto.setParticipants(participantDTOs);
+        }
+
+        return dto;
+    }
+
+    /**
+     * Helper con: Ánh xạ MeetingParticipant (Domain) sang MeetingParticipantDTO
+     */
+    private MeetingParticipantDTO convertParticipantToDTO(MeetingParticipant participant) {
+        if (participant == null) {
+            return null;
+        }
+
+        MeetingParticipantDTO dto = new MeetingParticipantDTO();
+        dto.setStatus(participant.getStatus()); // <-- Lấy status
+        
+        // Lấy thông tin User từ đối tượng lồng bên trong
+        if (participant.getUser() != null) {
+            dto.setId(participant.getUser().getId());
+            dto.setFullName(participant.getUser().getFullName());
+        }
+        
+        return dto;
     }
 
 }
