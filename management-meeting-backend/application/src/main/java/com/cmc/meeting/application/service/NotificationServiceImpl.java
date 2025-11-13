@@ -103,4 +103,12 @@ public class NotificationServiceImpl implements NotificationService {
         
         return dto;
     }
+    @Override
+    public void createNotification(User user, String message) {
+        // Gọi hàm khởi tạo, truyền 'meeting' là null
+        Notification notification = new Notification(message, user, null);
+        
+        // (Hàm khởi tạo Notification.java đã tự động set read=false)
+        notificationRepository.save(notification);
+    }
 }

@@ -16,4 +16,5 @@ public interface NotificationService {
 
     // API cho Backend (Service nội bộ)
     void createNotification(User user, String message, Meeting meeting);
+    void createNotification(User user, String message);
 }

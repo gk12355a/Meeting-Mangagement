@@ -293,16 +293,23 @@ public class MeetingServiceImpl implements MeetingService {
 
         meeting.respondToInvitation(currentUser, request.getStatus());
         Meeting savedMeeting = meetingRepository.save(meeting);
-
+        
         // BỔ SUNG: TẠO THÔNG BÁO IN-APP
         // Gửi thông báo cho Người tổ chức (organizer)
         String message = String.format(
-                "%s đã %s lời mời tham gia cuộc họp '%s'.",
-                currentUser.getFullName(),
-                request.getStatus() == ParticipantStatus.ACCEPTED ? "chấp nhận" : "từ chối",
-                savedMeeting.getTitle());
+            "%s đã %s lời mời tham gia cuộc họp '%s'.",
+            currentUser.getFullName(),
+            request.getStatus() == ParticipantStatus.ACCEPTED ? "chấp nhận" : "từ chối",
+            savedMeeting.getTitle()
+        );
+        
+        // ==========================================================
+        // SỬA LỖI: Gọi hàm KHÔNG có 'savedMeeting'
+        // (Để tránh gửi meetingId cho thông báo Phản hồi)
+        // ==========================================================
         notificationService.createNotification(
-                savedMeeting.getOrganizer(), message, savedMeeting);
+            savedMeeting.getOrganizer(), message
+        );
     }
 
     /**
