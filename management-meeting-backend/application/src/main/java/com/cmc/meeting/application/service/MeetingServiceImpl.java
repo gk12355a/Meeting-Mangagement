@@ -508,7 +508,7 @@ public class MeetingServiceImpl implements MeetingService {
                     break;
             }
         }
-        return new ArrayList<>();
+        return slots;
     }
 
     // BỔ SUNG: (BS-2.1)
