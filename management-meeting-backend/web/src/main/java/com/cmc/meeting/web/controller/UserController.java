@@ -1,5 +1,6 @@
 package com.cmc.meeting.web.controller;
 
+import com.cmc.meeting.application.dto.request.UserProfileUpdateRequest;
 import com.cmc.meeting.application.dto.response.UserDTO; // Dùng DTO đơn giản
 import com.cmc.meeting.application.port.service.UserService; // Service mới
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import com.cmc.meeting.application.dto.request.UserProfileUpdateRequest;
+// import com.cmc.meeting.application.dto.request.UserProfileUpdateRequest;
 import java.util.List;
 @RestController
 @RequestMapping("/api/v1/users") // Endpoint mới, không có /admin

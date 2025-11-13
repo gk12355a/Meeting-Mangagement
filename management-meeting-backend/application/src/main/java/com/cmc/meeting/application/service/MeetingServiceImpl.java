@@ -118,7 +118,8 @@ public class MeetingServiceImpl implements MeetingService {
         // --- 2. Xử lý Lịch định kỳ ---
         if (request.getRecurrenceRule() == null) {
             // --- A. HỌP 1 LẦN ---
-            checkAccessAndConflicts(room, organizer, participants, request.getStartTime(), request.getEndTime());
+            checkAccessAndConflicts(room, organizer, participants, devices, request.getStartTime(),
+                    request.getEndTime());
             return createSingleMeeting(request, room, creator, organizer,
                     participants, devices, guestEmails, null);
 
@@ -132,7 +133,7 @@ public class MeetingServiceImpl implements MeetingService {
 
             // Kiểm tra xung đột cho TẤT CẢ các slot
             for (TimeSlotDTO slot : slots) {
-                checkAccessAndConflicts(room, organizer, participants, slot.getStartTime(), slot.getEndTime());
+                checkAccessAndConflicts(room, organizer, participants, devices, slot.getStartTime(), slot.getEndTime());
             }
 
             // Tạo hàng loạt
@@ -165,19 +166,17 @@ public class MeetingServiceImpl implements MeetingService {
 
         meeting.cancelMeeting(request.getReason());
         Meeting savedMeeting = meetingRepository.save(meeting);
-        
+
         // BỔ SUNG: TẠO THÔNG BÁO IN-APP
         String message = String.format(
-            "Cuộc họp '%s' (lúc %s) đã bị hủy.",
-            savedMeeting.getTitle(),
-            savedMeeting.getStartTime().toLocalDate()
-        );
+                "Cuộc họp '%s' (lúc %s) đã bị hủy.",
+                savedMeeting.getTitle(),
+                savedMeeting.getStartTime().toLocalDate());
         // Gửi cho tất cả (trừ người hủy)
         savedMeeting.getParticipants().stream()
-            .filter(p -> !p.getUser().getId().equals(currentUserId))
-            .forEach(p -> notificationService.createNotification(
-                p.getUser(), message, savedMeeting
-            ));
+                .filter(p -> !p.getUser().getId().equals(currentUserId))
+                .forEach(p -> notificationService.createNotification(
+                        p.getUser(), message, savedMeeting));
     }
 
     /**
@@ -216,7 +215,7 @@ public class MeetingServiceImpl implements MeetingService {
         Set<String> newGuestEmails = (request.getGuestEmails() != null) ? request.getGuestEmails() : new HashSet<>();
 
         // Kiểm tra quyền và xung đột cho phòng/thời gian MỚI
-        checkAccessAndConflicts(newRoom, meeting.getOrganizer(), newParticipantUsers, request.getStartTime(),
+        checkAccessAndConflicts(newRoom, meeting.getOrganizer(), newParticipantUsers, newDevices, request.getStartTime(),
                 request.getEndTime());
 
         // Chuyển đổi sang Set<MeetingParticipant>
@@ -303,8 +302,13 @@ public class MeetingServiceImpl implements MeetingService {
             request.getStatus() == ParticipantStatus.ACCEPTED ? "chấp nhận" : "từ chối",
             savedMeeting.getTitle()
         );
+        
+        // ==========================================================
+        // SỬA LỖI: Gọi hàm KHÔNG có 'savedMeeting'
+        // (Để tránh gửi meetingId cho thông báo Phản hồi)
+        // ==========================================================
         notificationService.createNotification(
-            savedMeeting.getOrganizer(), message, savedMeeting
+            savedMeeting.getOrganizer(), message
         );
     }
 
@@ -411,22 +415,20 @@ public class MeetingServiceImpl implements MeetingService {
 
         // BỔ SUNG: TẠO THÔNG BÁO IN-APP
         String message = String.format(
-            "%s đã mời bạn tham gia cuộc họp: %s",
-            creator.getFullName(),
-            savedMeeting.getTitle()
-        );
+                "%s đã mời bạn tham gia cuộc họp: %s",
+                creator.getFullName(),
+                savedMeeting.getTitle());
         savedMeeting.getParticipants().stream()
-            .filter(p -> p.getStatus() == ParticipantStatus.PENDING)
-            .forEach(p -> notificationService.createNotification(
-                p.getUser(), message, savedMeeting
-            ));
+                .filter(p -> p.getStatus() == ParticipantStatus.PENDING)
+                .forEach(p -> notificationService.createNotification(
+                        p.getUser(), message, savedMeeting));
         return convertMeetingToDTO(savedMeeting);
     }
 
     /**
      * HELPER 2: Logic kiểm tra Xung đột VÀ Quyền (US-21)
      */
-    private void checkAccessAndConflicts(Room room, User organizer, Set<User> participants,
+    private void checkAccessAndConflicts(Room room, User organizer, Set<User> participants, Set<Device> devices,
             LocalDateTime startTime, LocalDateTime endTime) {
 
         if (room.getStatus() == RoomStatus.UNDER_MAINTENANCE) {
@@ -469,6 +471,11 @@ public class MeetingServiceImpl implements MeetingService {
 
             throw new MeetingConflictException(
                     String.format("Người tham dự (%s) bị trùng lịch vào lúc %s", conflictingUser, startTime));
+        }
+        Set<Long> deviceIds = devices.stream().map(Device::getId).collect(Collectors.toSet());
+        if (meetingRepository.isDeviceBusy(deviceIds, startTime, endTime)) {
+            throw new MeetingConflictException(
+                    String.format("Một trong các thiết bị bạn chọn đã bị đặt vào lúc %s", startTime));
         }
     }
 
@@ -537,6 +544,7 @@ public class MeetingServiceImpl implements MeetingService {
         log.info("-> (Update) Đang tạo chuỗi họp mới thay thế...");
         return this.createMeeting(request, currentUserId);
     }
+
     // CẬP NHẬT: (US-6)
     @Override
     @Transactional(readOnly = true)
@@ -544,17 +552,19 @@ public class MeetingServiceImpl implements MeetingService {
         Page<Meeting> meetings = meetingRepository.findAllByUserId(currentUserId, pageable);
         return meetings.map(this::convertMeetingToDTO);
     }
+
     @Override
     @Transactional(readOnly = true)
     public Page<MeetingDTO> getAllMeetings(Pageable pageable) {
-        
+
         // 1. Gọi hàm mới từ Repository Port
         Page<Meeting> meetingsPage = meetingRepository.findAllMeetings(pageable);
-        
+
         // 2. Ánh xạ (map) sang DTO
         // (Nếu bạn có hàm helper convertToDTO, hãy dùng nó)
         return meetingsPage.map(this::convertMeetingToDTO);
     }
+
     /**
      * Ánh xạ (map) từ Meeting (Domain) sang MeetingDTO
      * Sửa lỗi thiếu 'status' của 'participants'.
@@ -571,8 +581,8 @@ public class MeetingServiceImpl implements MeetingService {
         // 2. Ánh xạ 'participants' thủ công (PHẦN SỬA LỖI)
         if (meeting.getParticipants() != null) {
             List<MeetingParticipantDTO> participantDTOs = meeting.getParticipants().stream()
-                .map(this::convertParticipantToDTO) // Gọi hàm helper con
-                .collect(Collectors.toList());
+                    .map(this::convertParticipantToDTO) // Gọi hàm helper con
+                    .collect(Collectors.toList());
             dto.setParticipants(participantDTOs);
         }
 
@@ -589,13 +599,13 @@ public class MeetingServiceImpl implements MeetingService {
 
         MeetingParticipantDTO dto = new MeetingParticipantDTO();
         dto.setStatus(participant.getStatus()); // <-- Lấy status
-        
+
         // Lấy thông tin User từ đối tượng lồng bên trong
         if (participant.getUser() != null) {
             dto.setId(participant.getUser().getId());
             dto.setFullName(participant.getUser().getFullName());
         }
-        
+
         return dto;
     }
 

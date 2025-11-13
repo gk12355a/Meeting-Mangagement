@@ -124,5 +124,15 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
        Set<Long> findBookedDeviceIdsInTimeRange(
                      @Param("startTime") LocalDateTime startTime,
                      @Param("endTime") LocalDateTime endTime);
+
        Page<MeetingEntity> findAllByOrderByStartTimeDesc(Pageable pageable);
+
+       @Query("SELECT COUNT(m) > 0 FROM MeetingEntity m JOIN m.devices d " +
+                     "WHERE d.id IN :deviceIds " +
+                     "AND m.status != 'CANCELED' " +
+                     "AND m.startTime < :endTime AND m.endTime > :startTime")
+       boolean existsConflictingDevice(
+                     @Param("deviceIds") Set<Long> deviceIds,
+                     @Param("startTime") LocalDateTime startTime,
+                     @Param("endTime") LocalDateTime endTime);
 }
