@@ -641,5 +641,25 @@ public class MeetingServiceImpl implements MeetingService {
             ))
             .collect(Collectors.toList());
     }
+    @Override
+    @Transactional(readOnly = true)
+    public List<BookedSlotDTO> getDeviceSchedule(Long deviceId, LocalDateTime startTime, LocalDateTime endTime) {
+        
+        // Gọi hàm repository mới
+        List<Meeting> meetings = meetingRepository.findMeetingsByDeviceAndTimeRange(
+                deviceId, startTime, endTime
+        );
+        
+        // Map sang DTO đơn giản (Giống hệt getRoomSchedule)
+        return meetings.stream()
+            .map(meeting -> new BookedSlotDTO(
+                    meeting.getId(),
+                    meeting.getTitle(),
+                    meeting.getStartTime(),
+                    meeting.getEndTime(),
+                    meeting.getOrganizer().getFullName()
+            ))
+            .collect(Collectors.toList());
+    }
 
 }

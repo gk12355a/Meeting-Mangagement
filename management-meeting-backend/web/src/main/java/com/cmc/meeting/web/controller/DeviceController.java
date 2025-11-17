@@ -2,7 +2,10 @@ package com.cmc.meeting.web.controller;
 
 import com.cmc.meeting.application.dto.device.DeviceDTO;
 import com.cmc.meeting.application.dto.device.DeviceRequest;
+import com.cmc.meeting.application.dto.response.BookedSlotDTO;
 import com.cmc.meeting.application.port.service.DeviceService;
+import com.cmc.meeting.application.port.service.MeetingService;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,9 +28,10 @@ import java.util.List;
 public class DeviceController {
 
     private final DeviceService deviceService;
-
-    public DeviceController(DeviceService deviceService) {
+    private final MeetingService meetingService;
+    public DeviceController(DeviceService deviceService, MeetingService meetingService) {
         this.deviceService = deviceService;
+        this.meetingService = meetingService;
     }
 
     /**
@@ -75,5 +79,16 @@ public class DeviceController {
         
         List<DeviceDTO> availableDevices = deviceService.findAvailableDevices(startTime, endTime);
         return ResponseEntity.ok(availableDevices);
+    }
+    @GetMapping("/{id}/meetings")
+    @Operation(summary = "Lấy lịch sử dụng (lịch bận) của một thiết bị")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<List<BookedSlotDTO>> getDeviceSchedule(
+            @PathVariable Long id,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
+        
+        List<BookedSlotDTO> schedule = meetingService.getDeviceSchedule(id, startTime, endTime);
+        return ResponseEntity.ok(schedule);
     }
 }

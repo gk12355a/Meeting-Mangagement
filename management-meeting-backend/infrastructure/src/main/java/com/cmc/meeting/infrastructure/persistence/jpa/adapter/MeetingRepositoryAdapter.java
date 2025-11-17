@@ -270,4 +270,16 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
                 .map(entity -> modelMapper.map(entity, Meeting.class))
                 .collect(Collectors.toList());
     }
+    @Override
+    @Transactional(readOnly = true)
+    public List<Meeting> findMeetingsByDeviceAndTimeRange(Long deviceId, LocalDateTime startTime, LocalDateTime endTime) {
+        
+        // 1. Gọi hàm JPA mới
+        List<MeetingEntity> entities = jpaRepository.findMeetingsByDeviceAndTimeRange(deviceId, startTime, endTime);
+        
+        // 2. Map Entity -> Domain
+        return entities.stream()
+                .map(entity -> modelMapper.map(entity, Meeting.class))
+                .collect(Collectors.toList());
+    }
 }

@@ -37,4 +37,5 @@ public interface MeetingService {
     Page<MeetingDTO> getMyMeetings(Long currentUserId, Pageable pageable);
     Page<MeetingDTO> getAllMeetings(Pageable pageable);
     List<BookedSlotDTO> getRoomSchedule(Long roomId, LocalDateTime startTime, LocalDateTime endTime);
+    List<BookedSlotDTO> getDeviceSchedule(Long deviceId, LocalDateTime startTime, LocalDateTime endTime);
 }

@@ -165,4 +165,14 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
             @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime
     );
+    @Query("SELECT m FROM MeetingEntity m JOIN m.devices d " + // JOIN m.devices d
+           "WHERE d.id = :deviceId " +                       // WHERE d.id
+           "AND m.status != 'CANCELED' " +
+           "AND m.startTime < :endTime " +
+           "AND m.endTime > :startTime")
+    List<MeetingEntity> findMeetingsByDeviceAndTimeRange(
+            @Param("deviceId") Long deviceId,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime
+    );
 }
