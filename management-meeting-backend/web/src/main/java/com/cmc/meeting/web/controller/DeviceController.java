@@ -4,12 +4,13 @@ import com.cmc.meeting.application.dto.device.DeviceDTO;
 import com.cmc.meeting.application.dto.device.DeviceRequest;
 import com.cmc.meeting.application.dto.response.BookedSlotDTO;
 import com.cmc.meeting.application.port.service.DeviceService;
+import com.cmc.meeting.application.port.service.MeetingService;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,8 +29,6 @@ public class DeviceController {
 
     private final DeviceService deviceService;
     private final MeetingService meetingService;
-    
-    @Autowired
     public DeviceController(DeviceService deviceService, MeetingService meetingService) {
         this.deviceService = deviceService;
         this.meetingService = meetingService;
