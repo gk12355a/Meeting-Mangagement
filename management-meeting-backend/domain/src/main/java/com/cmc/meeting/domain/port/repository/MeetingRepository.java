@@ -57,4 +57,5 @@ public interface MeetingRepository {
     List<Meeting> findFutureMeetingsByOrganizerId(Long organizerId, LocalDateTime now);
 
     List<Meeting> findMeetingsByRoomAndTimeRange(Long roomId, LocalDateTime startTime, LocalDateTime endTime);
+    List<Meeting> findMeetingsByDeviceAndTimeRange(Long deviceId, LocalDateTime startTime, LocalDateTime endTime);
 }
