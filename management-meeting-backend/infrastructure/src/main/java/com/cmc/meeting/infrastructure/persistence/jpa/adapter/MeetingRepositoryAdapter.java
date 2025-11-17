@@ -19,6 +19,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 // Bỏ: TypeMap
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -253,6 +254,18 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
         List<MeetingEntity> entities = jpaRepository.findFutureMeetingsByOrganizerId(organizerId, now);
         
         // Map từ List<Entity> sang List<Domain Model>
+        return entities.stream()
+                .map(entity -> modelMapper.map(entity, Meeting.class))
+                .collect(Collectors.toList());
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public List<Meeting> findMeetingsByRoomAndTimeRange(Long roomId, LocalDateTime startTime, LocalDateTime endTime) {
+        
+        // 1. Gọi hàm JPA mới
+        List<MeetingEntity> entities = jpaRepository.findMeetingsByRoomAndTimeRange(roomId, startTime, endTime);
+        
+        // 2. Map Entity -> Domain
         return entities.stream()
                 .map(entity -> modelMapper.map(entity, Meeting.class))
                 .collect(Collectors.toList());

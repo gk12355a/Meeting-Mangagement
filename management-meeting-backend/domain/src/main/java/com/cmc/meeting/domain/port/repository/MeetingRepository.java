@@ -55,4 +55,6 @@ public interface MeetingRepository {
     boolean isDeviceBusy(Set<Long> deviceIds, LocalDateTime startTime, LocalDateTime endTime, Long meetingIdToIgnore);
 
     List<Meeting> findFutureMeetingsByOrganizerId(Long organizerId, LocalDateTime now);
+
+    List<Meeting> findMeetingsByRoomAndTimeRange(Long roomId, LocalDateTime startTime, LocalDateTime endTime);
 }
