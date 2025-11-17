@@ -34,6 +34,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -156,28 +157,36 @@ public class MeetingServiceImpl implements MeetingService {
      * (US-2) Hủy lịch họp
      */
     @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW) // <-- THÊM/SỬA DÒNG NÀY
     public void cancelMeeting(Long meetingId, MeetingCancelRequest request, Long currentUserId) {
         Meeting meeting = meetingRepository.findById(meetingId)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy cuộc họp với ID: " + meetingId));
 
-        // CHỈ người tổ chức mới được hủy
-        if (!meeting.getOrganizer().getId().equals(currentUserId)) {
-            throw new PolicyViolationException("Chỉ người tổ chức mới có quyền hủy cuộc họp này.");
+        // CHỈ người tổ chức mới được hủy (hoặc Admin)
+        // (Chúng ta nên thêm logic cho phép Admin)
+        boolean isAdmin = userRepository.findById(currentUserId)
+                            .map(u -> u.getRoles().contains(Role.ROLE_ADMIN))
+                            .orElse(false);
+
+        if (!meeting.getOrganizer().getId().equals(currentUserId) && !isAdmin) { // <-- Sửa logic
+            throw new PolicyViolationException("Chỉ người tổ chức hoặc Admin mới có quyền hủy cuộc họp này.");
         }
 
         meeting.cancelMeeting(request.getReason());
         Meeting savedMeeting = meetingRepository.save(meeting);
-
+        
         // BỔ SUNG: TẠO THÔNG BÁO IN-APP
         String message = String.format(
-                "Cuộc họp '%s' (lúc %s) đã bị hủy.",
-                savedMeeting.getTitle(),
-                savedMeeting.getStartTime().toLocalDate());
+            "Cuộc họp '%s' (lúc %s) đã bị hủy.",
+            savedMeeting.getTitle(),
+            savedMeeting.getStartTime().toLocalDate()
+        );
         // Gửi cho tất cả (trừ người hủy)
         savedMeeting.getParticipants().stream()
-                .filter(p -> !p.getUser().getId().equals(currentUserId))
-                .forEach(p -> notificationService.createNotification(
-                        p.getUser(), message, savedMeeting));
+            .filter(p -> !p.getUser().getId().equals(currentUserId))
+            .forEach(p -> notificationService.createNotification(
+                p.getUser(), message // Dùng hàm không có meetingId
+            ));
     }
 
     /**
