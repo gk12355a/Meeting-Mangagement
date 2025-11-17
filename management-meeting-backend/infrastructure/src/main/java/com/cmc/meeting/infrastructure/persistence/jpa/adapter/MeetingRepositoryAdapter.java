@@ -248,4 +248,13 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
         }
         return jpaRepository.existsConflictingDevice(deviceIds, startTime, endTime, meetingIdToIgnore);
     }
+    @Override
+    public List<Meeting> findFutureMeetingsByOrganizerId(Long organizerId, LocalDateTime now) {
+        List<MeetingEntity> entities = jpaRepository.findFutureMeetingsByOrganizerId(organizerId, now);
+        
+        // Map từ List<Entity> sang List<Domain Model>
+        return entities.stream()
+                .map(entity -> modelMapper.map(entity, Meeting.class))
+                .collect(Collectors.toList());
+    }
 }
