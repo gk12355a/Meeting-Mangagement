@@ -145,4 +145,13 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
             @Param("endTime") LocalDateTime endTime,
             @Param("ignoreId") Long ignoreId
     );
+
+    @Query("SELECT m FROM MeetingEntity m " +
+           "WHERE m.organizer.id = :organizerId " +
+           "AND m.status != 'CANCELLED' " +
+           "AND m.startTime > :now")
+    List<MeetingEntity> findFutureMeetingsByOrganizerId(
+            @Param("organizerId") Long organizerId,
+            @Param("now") LocalDateTime now
+    );
 }

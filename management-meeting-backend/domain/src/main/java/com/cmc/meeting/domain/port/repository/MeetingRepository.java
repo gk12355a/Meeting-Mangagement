@@ -53,4 +53,6 @@ public interface MeetingRepository {
     Page<Meeting> findAllMeetings(Pageable pageable);
 
     boolean isDeviceBusy(Set<Long> deviceIds, LocalDateTime startTime, LocalDateTime endTime, Long meetingIdToIgnore);
+
+    List<Meeting> findFutureMeetingsByOrganizerId(Long organizerId, LocalDateTime now);
 }
