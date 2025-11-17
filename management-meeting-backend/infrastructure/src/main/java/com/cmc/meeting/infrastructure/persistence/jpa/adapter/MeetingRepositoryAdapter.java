@@ -60,8 +60,8 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
     }
 
     @Override
-    public boolean isRoomBusy(Long roomId, LocalDateTime startTime, LocalDateTime endTime) {
-        return jpaRepository.findRoomOverlap(roomId, startTime, endTime);
+    public boolean isRoomBusy(Long roomId, LocalDateTime startTime, LocalDateTime endTime, Long meetingIdToIgnore) {
+        return jpaRepository.findRoomOverlap(roomId, startTime, endTime, meetingIdToIgnore);
     }
 
     @Override
@@ -219,9 +219,10 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
 
     // CẬP NHẬT: (US-5)
     @Override
-    public List<Meeting> findConflictingMeetingsForUsers(Set<Long> userIds, LocalDateTime from, LocalDateTime to) {
-        return jpaRepository.findConflictingMeetingsForUsers(userIds, from, to).stream()
-                .map(this::toDomain)
+    public List<Meeting> findConflictingMeetingsForUsers(Set<Long> userIds, LocalDateTime startTime, LocalDateTime endTime, Long meetingIdToIgnore) {
+        List<MeetingEntity> entities = jpaRepository.findConflictingMeetingsForUsers(userIds, startTime, endTime, meetingIdToIgnore);
+        return entities.stream()
+                .map(entity -> modelMapper.map(entity, Meeting.class))
                 .collect(Collectors.toList());
     }
 
@@ -241,10 +242,10 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
     }
 
     @Override
-    public boolean isDeviceBusy(Set<Long> deviceIds, LocalDateTime startTime, LocalDateTime endTime) {
+    public boolean isDeviceBusy(Set<Long> deviceIds, LocalDateTime startTime, LocalDateTime endTime, Long meetingIdToIgnore) {
         if (deviceIds == null || deviceIds.isEmpty()) {
             return false;
         }
-        return jpaRepository.existsConflictingDevice(deviceIds, startTime, endTime);
+        return jpaRepository.existsConflictingDevice(deviceIds, startTime, endTime, meetingIdToIgnore);
     }
 }
