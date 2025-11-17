@@ -6,6 +6,7 @@ import com.cmc.meeting.application.dto.meeting.MeetingCancelRequest;
 import com.cmc.meeting.application.dto.meeting.MeetingResponseRequest;
 import com.cmc.meeting.application.dto.request.MeetingCreationRequest;
 import com.cmc.meeting.application.dto.request.MeetingUpdateRequest;
+import com.cmc.meeting.application.dto.response.BookedSlotDTO;
 import com.cmc.meeting.application.dto.response.MeetingDTO;
 import com.cmc.meeting.application.dto.response.MeetingParticipantDTO;
 import com.cmc.meeting.application.dto.recurrence.RecurrenceRuleDTO;
@@ -619,6 +620,26 @@ public class MeetingServiceImpl implements MeetingService {
         }
 
         return dto;
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public List<BookedSlotDTO> getRoomSchedule(Long roomId, LocalDateTime startTime, LocalDateTime endTime) {
+        
+        // Gọi hàm repository mới
+        List<Meeting> meetings = meetingRepository.findMeetingsByRoomAndTimeRange(
+                roomId, startTime, endTime
+        );
+        
+        // Map sang DTO đơn giản
+        return meetings.stream()
+            .map(meeting -> new BookedSlotDTO(
+                    meeting.getId(),
+                    meeting.getTitle(),
+                    meeting.getStartTime(),
+                    meeting.getEndTime(),
+                    meeting.getOrganizer().getFullName()
+            ))
+            .collect(Collectors.toList());
     }
 
 }
