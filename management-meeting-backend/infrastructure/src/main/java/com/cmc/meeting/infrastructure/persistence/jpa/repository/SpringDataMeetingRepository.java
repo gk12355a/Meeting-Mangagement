@@ -23,14 +23,17 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
        Page<MeetingEntity> findMyMeetings(Long userId, Pageable pageable);
 
        // CẬP NHẬT: (US-5)
-       @Query("SELECT DISTINCT m FROM MeetingEntity m JOIN m.participants p " +
-                     "WHERE m.status = 'CONFIRMED' " +
-                     "AND m.startTime < :to AND m.endTime > :from " +
-                     "AND (p.userId IN :userIds OR m.organizer.id IN :userIds)") // Sửa: check cả organizer
+       @Query("SELECT m FROM MeetingEntity m JOIN m.participants p " +
+                     "WHERE p.user.id IN :userIds " +
+                     "AND m.status != 'CANCELED' " +
+                     "AND m.startTime < :endTime AND m.endTime > :startTime " +
+                     "AND (:ignoreId IS NULL OR m.id != :ignoreId)") // <-- THÊM DÒNG NÀY
        List<MeetingEntity> findConflictingMeetingsForUsers(
                      @Param("userIds") Set<Long> userIds,
-                     @Param("from") LocalDateTime from,
-                     @Param("to") LocalDateTime to);
+                     @Param("startTime") LocalDateTime startTime,
+                     @Param("endTime") LocalDateTime endTime,
+                     @Param("ignoreId") Long ignoreId // <-- THÊM THAM SỐ NÀY
+       );
 
        /**
         * Hiện thực logic kiểm tra trùng lịch (isRoomBusy)
@@ -40,10 +43,12 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
                      "WHERE m.room.id = :roomId " +
                      "AND m.status = 'CONFIRMED' " +
                      "AND m.startTime < :endTime " + // Cuộc họp cũ kết thúc SAU khi cuộc họp mới bắt đầu
-                     "AND m.endTime > :startTime") // Cuộc họp cũ bắt đầu TRƯỚC khi cuộc họp mới kết thúc
+                     "AND m.endTime > :startTime" +
+                     "AND (:ignoreId IS NULL OR m.id != :ignoreId)") // Cuộc họp cũ bắt đầu TRƯỚC khi cuộc họp mới kết thúc
        boolean findRoomOverlap(@Param("roomId") Long roomId,
                      @Param("startTime") LocalDateTime startTime,
-                     @Param("endTime") LocalDateTime endTime);
+                     @Param("endTime") LocalDateTime endTime,
+                     @Param("ignoreId") Long ignoreId);
 
        @Query("SELECT DISTINCT m FROM MeetingEntity m " +
                      "LEFT JOIN m.participants p " +
@@ -130,9 +135,12 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
        @Query("SELECT COUNT(m) > 0 FROM MeetingEntity m JOIN m.devices d " +
                      "WHERE d.id IN :deviceIds " +
                      "AND m.status != 'CANCELED' " +
-                     "AND m.startTime < :endTime AND m.endTime > :startTime")
+                     "AND m.startTime < :endTime AND m.endTime > :startTime " +
+                     "AND (:ignoreId IS NULL OR m.id != :ignoreId)") // <-- THÊM DÒNG NÀY
        boolean existsConflictingDevice(
                      @Param("deviceIds") Set<Long> deviceIds,
                      @Param("startTime") LocalDateTime startTime,
-                     @Param("endTime") LocalDateTime endTime);
+                     @Param("endTime") LocalDateTime endTime,
+                     @Param("ignoreId") Long ignoreId // <-- THÊM THAM SỐ NÀY
+       );
 }

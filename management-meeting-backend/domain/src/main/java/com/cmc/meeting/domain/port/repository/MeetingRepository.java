@@ -19,21 +19,38 @@ public interface MeetingRepository {
     Optional<Meeting> findById(Long id);
 
     // Sẽ cần thêm các method phức tạp sau
-    // ví dụ: boolean isRoomBusy(Long roomId, LocalDateTime start, LocalDateTime end);
-    boolean isRoomBusy(Long roomId, LocalDateTime startTime, LocalDateTime endTime);
+    // ví dụ: boolean isRoomBusy(Long roomId, LocalDateTime start, LocalDateTime
+    // end);
+    boolean isRoomBusy(Long roomId, LocalDateTime startTime, LocalDateTime endTime, Long meetingIdToIgnore);
+
     List<Meeting> findAllByUserId(Long userId);
+
     List<Meeting> findConfirmedMeetingsInDateRange(LocalDateTime from, LocalDateTime to);
+
     Optional<Meeting> findMeetingByParticipantToken(String token);
+
     Optional<Meeting> findCheckInEligibleMeeting(Long organizerId, Long roomId, LocalDateTime now);
+
     List<Meeting> findUncheckedInMeetings(LocalDateTime cutoffTime);
+
     List<Meeting> findMeetingsForUsersInDateRange(Set<Long> userIds, LocalDateTime from, LocalDateTime to);
+
     List<Meeting> findCanceledMeetingsInDateRange(LocalDateTime from, LocalDateTime to);
+
     List<Meeting> findAllBySeriesId(String seriesId);
+
     List<Meeting> findMeetingsWithGuestsInDateRange(LocalDateTime from, LocalDateTime to);
+
     boolean existsByOrganizerId(Long organizerId);
+
     Page<Meeting> findAllByUserId(Long userId, Pageable pageable);
-    List<Meeting> findConflictingMeetingsForUsers(Set<Long> userIds, LocalDateTime from, LocalDateTime to);
+
+    List<Meeting> findConflictingMeetingsForUsers(Set<Long> userIds, LocalDateTime startTime, LocalDateTime endTime,
+            Long meetingIdToIgnore);
+
     Set<Long> findBookedDevicesInTimeRange(LocalDateTime startTime, LocalDateTime endTime);
+
     Page<Meeting> findAllMeetings(Pageable pageable);
-    boolean isDeviceBusy(Set<Long> deviceIds, LocalDateTime startTime, LocalDateTime endTime);
+
+    boolean isDeviceBusy(Set<Long> deviceIds, LocalDateTime startTime, LocalDateTime endTime, Long meetingIdToIgnore);
 }
