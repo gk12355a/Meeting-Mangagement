@@ -73,4 +73,24 @@ public class EmailNotificationAdapter implements EmailNotificationPort {
             System.err.println("Lỗi gửi mail reset mật khẩu: " + e.getMessage());
         }
     }
+
+    @Override
+    public void sendWelcomeEmail(User user, String rawPassword) {
+        // 1. Định nghĩa key (phải khớp với CSDL)
+        final String TEMPLATE_KEY = "email.template.welcome";
+        final String subject = "Chào mừng bạn đến với Hệ thống Đặt lịch họp";
+
+        // 2. Tạo biến (variables) cho Thymeleaf
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("fullName", user.getFullName());
+        variables.put("username", user.getUsername());
+        variables.put("rawPassword", rawPassword);
+        variables.put("loginUrl", appConfigService.getValue("frontend.base-url", "http://localhost:5173") + "/login");
+
+        // 3. Xử lý template
+        String htmlBody = thymeleafService.processTemplate(TEMPLATE_KEY, variables);
+
+        // 4. Gửi email
+        this.sendHtmlEmail(user.getUsername(), subject, htmlBody);
+    }
 }

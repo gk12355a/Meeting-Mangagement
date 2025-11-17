@@ -2,6 +2,7 @@ package com.cmc.meeting.web.controller;
 
 import com.cmc.meeting.application.dto.admin.AdminUserDTO;
 import com.cmc.meeting.application.dto.admin.AdminUserUpdateRequest;
+import com.cmc.meeting.application.dto.request.AdminUserCreationRequest;
 import com.cmc.meeting.application.port.service.AdminUserService;
 import com.cmc.meeting.domain.port.repository.UserRepository;
 import com.cmc.meeting.domain.model.User; // <-- Import User
@@ -11,6 +12,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -71,4 +74,14 @@ public class AdminUserController {
                 .orElseThrow(() -> new EntityNotFoundException("User không tồn tại từ token"));
         return user.getId();
     }
+
+    @PostMapping
+    @Operation(summary = "Tạo người dùng mới (Admin only)")
+    public ResponseEntity<AdminUserDTO> createUser(
+            @Valid @RequestBody AdminUserCreationRequest request) {
+        
+        AdminUserDTO newUser = adminUserService.createUser(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(newUser);
+    }
+    
 }
