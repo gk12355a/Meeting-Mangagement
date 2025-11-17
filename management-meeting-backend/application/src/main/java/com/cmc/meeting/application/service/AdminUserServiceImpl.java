@@ -3,22 +3,27 @@ package com.cmc.meeting.application.service;
 import com.cmc.meeting.application.dto.admin.AdminUserDTO;
 import com.cmc.meeting.application.dto.admin.AdminUserUpdateRequest;
 import com.cmc.meeting.application.port.service.AdminUserService;
+import com.cmc.meeting.domain.event.UserCreatedEvent;
 import com.cmc.meeting.domain.exception.PolicyViolationException;
 import com.cmc.meeting.domain.model.User;
 import com.cmc.meeting.domain.port.repository.MeetingRepository;
 import com.cmc.meeting.domain.port.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.modelmapper.ModelMapper;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.cmc.meeting.domain.model.Role;
 import com.cmc.meeting.application.port.service.MeetingService;
-import com.cmc.meeting.application.dto.meeting.MeetingCancelRequest; 
+import com.cmc.meeting.application.dto.meeting.MeetingCancelRequest;
+import com.cmc.meeting.application.dto.request.AdminUserCreationRequest;
 import com.cmc.meeting.domain.model.Meeting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,18 +38,24 @@ public class AdminUserServiceImpl implements AdminUserService {
     
     // === TIÊM (INJECT) SERVICE MỚI ===
     private final MeetingService meetingService;
+    private final PasswordEncoder passwordEncoder;
+    private final ApplicationEventPublisher eventPublisher;
 
     // === CẬP NHẬT CONSTRUCTOR ===
     public AdminUserServiceImpl(UserRepository userRepository,
             ModelMapper modelMapper,
             MeetingRepository meetingRepository,
-            MeetingService meetingService) { // <-- Thêm service
+            MeetingService meetingService,
+            PasswordEncoder passwordEncoder, // <-- THÊM MỚI
+            ApplicationEventPublisher eventPublisher // <-- THÊM MỚI
+    ) {
         this.userRepository = userRepository;
         this.modelMapper = modelMapper;
         this.meetingRepository = meetingRepository;
-        this.meetingService = meetingService; // <-- Thêm service
+        this.meetingService = meetingService;
+        this.passwordEncoder = passwordEncoder; // <-- THÊM MỚI
+        this.eventPublisher = eventPublisher; // <-- THÊM MỚI
     }
-
     @Override
     @Transactional(readOnly = true)
     public List<AdminUserDTO> getAllUsers() {
@@ -137,4 +148,36 @@ public class AdminUserServiceImpl implements AdminUserService {
         
         log.info("Đã vô hiệu hóa (soft delete) User ID: {} thành công.", userIdToDelete);
     }
+    @Override
+    public AdminUserDTO createUser(AdminUserCreationRequest request) {
+        
+        // 1. Kiểm tra username (email) đã tồn tại chưa
+        if (userRepository.findByUsername(request.getUsername()).isPresent()) {
+            throw new PolicyViolationException("Email (username) này đã được sử dụng.");
+        }
+
+        // 2. Tạo mật khẩu ngẫu nhiên (ví dụ: 10 ký tự)
+        String rawPassword = UUID.randomUUID().toString().substring(0, 10);
+
+        // 3. Tạo đối tượng User
+        User newUser = new User();
+        newUser.setFullName(request.getFullName());
+        newUser.setUsername(request.getUsername());
+        newUser.setRoles(request.getRoles());
+        newUser.setActive(true); // Mặc định là active
+
+        // 4. Băm (Hash) mật khẩu và lưu
+        newUser.setPassword(passwordEncoder.encode(rawPassword));
+        User savedUser = userRepository.save(newUser);
+        
+        log.info("Đã tạo User ID: {} với mật khẩu (đã băm).", savedUser.getId());
+
+        // 5. KÍCH HOẠT SỰ KIỆN (Gửi kèm mật khẩu THÔ)
+        // Listener sẽ bắt sự kiện này và gửi email
+        eventPublisher.publishEvent(new UserCreatedEvent(savedUser.getId(), rawPassword));
+
+        return modelMapper.map(savedUser, AdminUserDTO.class);
+    }
+
+
 }
