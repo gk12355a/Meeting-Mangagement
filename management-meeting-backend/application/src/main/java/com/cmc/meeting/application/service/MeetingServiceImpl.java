@@ -118,8 +118,9 @@ public class MeetingServiceImpl implements MeetingService {
         // --- 2. Xử lý Lịch định kỳ ---
         if (request.getRecurrenceRule() == null) {
             // --- A. HỌP 1 LẦN ---
-            checkAccessAndConflicts(room, organizer, participants, devices, request.getStartTime(),
-                    request.getEndTime());
+            checkAccessAndConflicts(room, organizer, participants, devices, 
+                                    request.getStartTime(), request.getEndTime(), null); // <-- SỬA Ở ĐÂY
+            
             return createSingleMeeting(request, room, creator, organizer,
                     participants, devices, guestEmails, null);
 
@@ -133,7 +134,7 @@ public class MeetingServiceImpl implements MeetingService {
 
             // Kiểm tra xung đột cho TẤT CẢ các slot
             for (TimeSlotDTO slot : slots) {
-                checkAccessAndConflicts(room, organizer, participants, devices, slot.getStartTime(), slot.getEndTime());
+                checkAccessAndConflicts(room, organizer, participants, devices, slot.getStartTime(), slot.getEndTime(), null);
             }
 
             // Tạo hàng loạt
@@ -215,8 +216,10 @@ public class MeetingServiceImpl implements MeetingService {
         Set<String> newGuestEmails = (request.getGuestEmails() != null) ? request.getGuestEmails() : new HashSet<>();
 
         // Kiểm tra quyền và xung đột cho phòng/thời gian MỚI
-        checkAccessAndConflicts(newRoom, meeting.getOrganizer(), newParticipantUsers, newDevices, request.getStartTime(),
-                request.getEndTime());
+        checkAccessAndConflicts(newRoom, meeting.getOrganizer(), newParticipantUsers, newDevices,
+                request.getStartTime(), request.getEndTime(),
+                meetingId // <-- THÊM THAM SỐ NÀY (ID của cuộc họp đang sửa)
+        );
 
         // Chuyển đổi sang Set<MeetingParticipant>
         Set<MeetingParticipant> newParticipants = new HashSet<>();
@@ -429,7 +432,7 @@ public class MeetingServiceImpl implements MeetingService {
      * HELPER 2: Logic kiểm tra Xung đột VÀ Quyền (US-21)
      */
     private void checkAccessAndConflicts(Room room, User organizer, Set<User> participants, Set<Device> devices,
-            LocalDateTime startTime, LocalDateTime endTime) {
+            LocalDateTime startTime, LocalDateTime endTime, Long meetingIdToIgnore){
 
         if (room.getStatus() == RoomStatus.UNDER_MAINTENANCE) {
             throw new PolicyViolationException(
@@ -449,7 +452,7 @@ public class MeetingServiceImpl implements MeetingService {
         }
 
         // 2. KIỂM TRA XUNG ĐỘT (Phòng)
-        if (meetingRepository.isRoomBusy(room.getId(), startTime, endTime)) {
+        if (meetingRepository.isRoomBusy(room.getId(), startTime, endTime, meetingIdToIgnore)) {
             throw new MeetingConflictException(
                     String.format("Phòng '%s' đã bị đặt vào lúc %s", room.getName(), startTime));
         }
@@ -461,7 +464,7 @@ public class MeetingServiceImpl implements MeetingService {
         userIdsToCheck.add(organizer.getId()); // Thêm cả organizer vào danh sách check
 
         List<Meeting> conflictingUserMeetings = meetingRepository
-                .findConflictingMeetingsForUsers(userIdsToCheck, startTime, endTime);
+                .findConflictingMeetingsForUsers(userIdsToCheck, startTime, endTime, meetingIdToIgnore);
 
         if (!conflictingUserMeetings.isEmpty()) {
             // Tìm xem ai là người bị trùng
@@ -473,10 +476,10 @@ public class MeetingServiceImpl implements MeetingService {
                     String.format("Người tham dự (%s) bị trùng lịch vào lúc %s", conflictingUser, startTime));
         }
         Set<Long> deviceIds = devices.stream().map(Device::getId).collect(Collectors.toSet());
-        if (meetingRepository.isDeviceBusy(deviceIds, startTime, endTime)) {
-            throw new MeetingConflictException(
-                    String.format("Một trong các thiết bị bạn chọn đã bị đặt vào lúc %s", startTime));
-        }
+        if (meetingRepository.isDeviceBusy(deviceIds, startTime, endTime, meetingIdToIgnore)) {
+                throw new MeetingConflictException(
+                        String.format("Một hoặc nhiều thiết bị bạn chọn đã bị đặt vào lúc %s", startTime));
+            }
     }
 
     /**
