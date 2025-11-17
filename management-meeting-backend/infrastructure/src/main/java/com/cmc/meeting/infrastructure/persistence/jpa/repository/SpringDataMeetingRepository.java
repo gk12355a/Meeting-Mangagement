@@ -1,7 +1,8 @@
 package com.cmc.meeting.infrastructure.persistence.jpa.repository;
 
 import com.cmc.meeting.infrastructure.persistence.jpa.entity.MeetingEntity;
-
+// (Import UserEntity nếu bạn có)
+// import com.cmc.meeting.infrastructure.persistence.jpa.entity.UserEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,132 +16,133 @@ import java.util.Set;
 
 public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity, Long> {
 
-       // CẬP NHẬT: (US-6) Thêm Pageable, đổi tên
-       @Query("SELECT m FROM MeetingEntity m " +
-                     "LEFT JOIN m.participants p " +
-                     "WHERE m.organizer.id = :userId OR p.userId = :userId " +
-                     "ORDER BY m.startTime DESC") // Sắp xếp theo ngày mới nhất
-       Page<MeetingEntity> findMyMeetings(Long userId, Pageable pageable);
+    // (US-6) Lấy lịch họp của tôi (phân trang)
+    @Query("SELECT m FROM MeetingEntity m " +
+            "LEFT JOIN m.participants p " +
+            // Giả sử EmbeddableParticipant của bạn có trường 'userId'
+            "WHERE m.organizer.id = :userId OR p.userId = :userId " +
+            "ORDER BY m.startTime DESC")
+    Page<MeetingEntity> findMyMeetings(@Param("userId") Long userId, Pageable pageable);
 
-       // CẬP NHẬT: (US-5)
-       @Query("SELECT m FROM MeetingEntity m JOIN m.participants p " +
-                     "WHERE p.user.id IN :userIds " +
-                     "AND m.status != 'CANCELED' " +
-                     "AND m.startTime < :endTime AND m.endTime > :startTime " +
-                     "AND (:ignoreId IS NULL OR m.id != :ignoreId)") // <-- THÊM DÒNG NÀY
-       List<MeetingEntity> findConflictingMeetingsForUsers(
-                     @Param("userIds") Set<Long> userIds,
-                     @Param("startTime") LocalDateTime startTime,
-                     @Param("endTime") LocalDateTime endTime,
-                     @Param("ignoreId") Long ignoreId // <-- THÊM THAM SỐ NÀY
-       );
+    // (US-5) Kiểm tra xung đột người tham gia
+    @Query("SELECT m FROM MeetingEntity m JOIN m.participants p " +
+            // SỬA LỖI 1: Đổi p.user.id thành p.userId
+            "WHERE p.userId IN :userIds " +
+            "AND m.status != 'CANCELED' " +
+            "AND m.startTime < :endTime AND m.endTime > :startTime " +
+            "AND (:ignoreId IS NULL OR m.id != :ignoreId)")
+    List<MeetingEntity> findConflictingMeetingsForUsers(
+            @Param("userIds") Set<Long> userIds,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime,
+            @Param("ignoreId") Long ignoreId);
 
-       /**
-        * Hiện thực logic kiểm tra trùng lịch (isRoomBusy)
-        * Đây là query kiểm tra "khoảng thời gian chồng chéo" (Overlap)
-        */
-       @Query("SELECT COUNT(m) > 0 FROM MeetingEntity m " +
-                     "WHERE m.room.id = :roomId " +
-                     "AND m.status = 'CONFIRMED' " +
-                     "AND m.startTime < :endTime " + // Cuộc họp cũ kết thúc SAU khi cuộc họp mới bắt đầu
-                     "AND m.endTime > :startTime" +
-                     "AND (:ignoreId IS NULL OR m.id != :ignoreId)") // Cuộc họp cũ bắt đầu TRƯỚC khi cuộc họp mới kết thúc
-       boolean findRoomOverlap(@Param("roomId") Long roomId,
-                     @Param("startTime") LocalDateTime startTime,
-                     @Param("endTime") LocalDateTime endTime,
-                     @Param("ignoreId") Long ignoreId);
+    /**
+     * Kiểm tra xung đột phòng (isRoomBusy)
+     */
+    @Query("SELECT COUNT(m) > 0 FROM MeetingEntity m " +
+            "WHERE m.room.id = :roomId " +
+            "AND m.status != 'CANCELED' " + // Đổi từ 'CONFIRMED' sang '!= CANCELED'
+            "AND m.startTime < :endTime " +
+            "AND m.endTime > :startTime " + // SỬA LỖI 2: Thêm dấu cách ở cuối
+            "AND (:ignoreId IS NULL OR m.id != :ignoreId)")
+    boolean findRoomOverlap(@Param("roomId") Long roomId,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime,
+            @Param("ignoreId") Long ignoreId);
+            
+    // (US-6) Lấy lịch họp của tôi (bản cũ, không phân trang)
+    @Query("SELECT DISTINCT m FROM MeetingEntity m " +
+            "LEFT JOIN m.participants p " +
+            "WHERE m.organizer.id = :userId OR p.userId = :userId")
+    List<MeetingEntity> findAllByUserId(@Param("userId") Long userId);
 
-       @Query("SELECT DISTINCT m FROM MeetingEntity m " +
-                     "LEFT JOIN m.participants p " +
-                     "WHERE m.organizer.id = :userId OR p.userId = :userId") // <-- SỬA p.id THÀNH p.userId
-       List<MeetingEntity> findAllByUserId(@Param("userId") Long userId);
+    // (US-22) Báo cáo sử dụng phòng
+    @Query("SELECT m FROM MeetingEntity m " +
+            "WHERE m.status = 'CONFIRMED' " +
+            "AND m.startTime >= :from AND m.endTime <= :to")
+    List<MeetingEntity> findConfirmedMeetingsInDateRange(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to);
 
-       // BỔ SUNG: (US-22)
-       // Tìm các cuộc họp đã 'CONFIRMED' nằm trong khoảng thời gian
-       @Query("SELECT m FROM MeetingEntity m " +
-                     "WHERE m.status = 'CONFIRMED' " +
-                     "AND m.startTime >= :from AND m.endTime <= :to")
-       List<MeetingEntity> findConfirmedMeetingsInDateRange(
-                     @Param("from") LocalDateTime from,
-                     @Param("to") LocalDateTime to);
+    // Tìm họp bằng token (để phản hồi)
+    @Query("SELECT m FROM MeetingEntity m JOIN m.participants p WHERE p.responseToken = :token")
+    Optional<MeetingEntity> findMeetingByParticipantToken(@Param("token") String token);
 
-       @Query("SELECT m FROM MeetingEntity m JOIN m.participants p WHERE p.responseToken = :token")
-       Optional<MeetingEntity> findMeetingByParticipantToken(@Param("token") String token);
+    // Tìm họp để check-in
+    @Query("SELECT m FROM MeetingEntity m " +
+            "WHERE m.organizer.id = :organizerId " +
+            "AND m.room.id = :roomId " +
+            "AND m.status = 'CONFIRMED' " +
+            "AND m.isCheckedIn = false " +
+            "AND m.startTime BETWEEN :timeStartWindow AND :timeEndWindow")
+    Optional<MeetingEntity> findCheckInEligibleMeeting(
+            @Param("organizerId") Long organizerId,
+            @Param("roomId") Long roomId,
+            @Param("timeStartWindow") LocalDateTime timeStartWindow,
+            @Param("timeEndWindow") LocalDateTime timeEndWindow);
 
-       @Query("SELECT m FROM MeetingEntity m " +
-                     "WHERE m.organizer.id = :organizerId " +
-                     "AND m.room.id = :roomId " +
-                     "AND m.status = 'CONFIRMED' " +
-                     "AND m.isCheckedIn = false " +
-                     // Điều kiện thời gian:
-                     // (Từ 15 phút trước giờ họp ĐẾN 30 phút sau giờ họp)
-                     "AND m.startTime BETWEEN :timeStartWindow AND :timeEndWindow")
-       Optional<MeetingEntity> findCheckInEligibleMeeting(
-                     @Param("organizerId") Long organizerId,
-                     @Param("roomId") Long roomId,
-                     @Param("timeStartWindow") LocalDateTime timeStartWindow, // vd: now - 15 phút
-                     @Param("timeEndWindow") LocalDateTime timeEndWindow); // vd: now + 30 phút
+    // Tìm họp chưa check-in (để tự động hủy)
+    @Query("SELECT m FROM MeetingEntity m " +
+            "WHERE m.status = 'CONFIRMED' " +
+            "AND m.isCheckedIn = false " +
+            "AND m.startTime < :cutoffTime")
+    List<MeetingEntity> findUncheckedInMeetings(@Param("cutoffTime") LocalDateTime cutoffTime);
 
-       @Query("SELECT m FROM MeetingEntity m " +
-                     "WHERE m.status = 'CONFIRMED' " +
-                     "AND m.isCheckedIn = false " +
-                     // startTime đã qua thời gian cutoff (vd: 15 phút)
-                     "AND m.startTime < :cutoffTime")
-       List<MeetingEntity> findUncheckedInMeetings(@Param("cutoffTime") LocalDateTime cutoffTime);
+    // (US-5) Tìm lịch sử họp của nhóm người
+    @Query("SELECT m FROM MeetingEntity m JOIN m.participants p " +
+            "WHERE m.status = 'CONFIRMED' " +
+            "AND m.startTime < :to AND m.endTime > :from " +
+            "AND p.userId IN :userIds") // Giả sử là p.userId
+    List<MeetingEntity> findMeetingsForUsersInDateRange(
+            @Param("userIds") Set<Long> userIds,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to);
 
-       // BỔ SUNG: (US-5)
-       @Query("SELECT m FROM MeetingEntity m JOIN m.participants p " +
-                     "WHERE m.status = 'CONFIRMED' " +
-                     // Thời gian họp (m) chồng chéo với khoảng thời gian tìm kiếm (from, to)
-                     "AND m.startTime < :to AND m.endTime > :from " +
-                     // VÀ (p) là một trong các user trong danh sách
-                     "AND p.userId IN :userIds")
-       List<MeetingEntity> findMeetingsForUsersInDateRange(
-                     @Param("userIds") Set<Long> userIds,
-                     @Param("from") LocalDateTime from,
-                     @Param("to") LocalDateTime to);
+    // (US-23) Báo cáo hủy họp
+    @Query("SELECT m FROM MeetingEntity m " +
+            "WHERE m.status = 'CANCELLED' " +
+            "AND m.cancelledAt >= :from AND m.cancelledAt <= :to")
+    List<MeetingEntity> findCanceledMeetingsInDateRange(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to);
 
-       // BỔ SUNG: (US-23)
-       // Tìm các cuộc họp đã 'CANCELLED' trong khoảng thời gian
-       @Query("SELECT m FROM MeetingEntity m " +
-                     "WHERE m.status = 'CANCELLED' " +
-                     "AND m.cancelledAt >= :from AND m.cancelledAt <= :to")
-       List<MeetingEntity> findCanceledMeetingsInDateRange(
-                     @Param("from") LocalDateTime from,
-                     @Param("to") LocalDateTime to);
+    // Tìm các cuộc họp trong chuỗi
+    List<MeetingEntity> findAllBySeriesId(String seriesId);
 
-       List<MeetingEntity> findAllBySeriesId(String seriesId);
+    // (BS-31) Báo cáo khách
+    @Query("SELECT m FROM MeetingEntity m " +
+            "WHERE m.status = 'CONFIRMED' " +
+            "AND m.startTime >= :from AND m.startTime <= :to " +
+            "AND m.guestEmails IS NOT EMPTY")
+    List<MeetingEntity> findMeetingsWithGuestsInDateRange(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to);
 
-       // BỔ SUNG: (BS-31)
-       @Query("SELECT m FROM MeetingEntity m " +
-                     "WHERE m.status = 'CONFIRMED' " +
-                     "AND m.startTime >= :from AND m.startTime <= :to " +
-                     "AND m.guestEmails IS NOT EMPTY") // Chỉ lấy cuộc họp có khách
-       List<MeetingEntity> findMeetingsWithGuestsInDateRange(
-                     @Param("from") LocalDateTime from,
-                     @Param("to") LocalDateTime to);
+    boolean existsByOrganizerId(Long organizerId);
 
-       boolean existsByOrganizerId(Long organizerId);
+    // Tìm các thiết bị đã bị đặt
+    @Query("SELECT d.id FROM MeetingEntity m JOIN m.devices d " +
+            "WHERE m.status != 'CANCELED' " +
+            "AND m.startTime < :endTime " +
+            "AND m.endTime > :startTime")
+    Set<Long> findBookedDeviceIdsInTimeRange(
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime);
 
-       @Query("SELECT d.id FROM MeetingEntity m JOIN m.devices d " +
-                     "WHERE m.status != 'CANCELED' " + // Chỉ check các cuộc họp không bị hủy
-                     "AND m.startTime < :endTime " + // Logic kiểm tra chồng lấn
-                     "AND m.endTime > :startTime") // Logic kiểm tra chồng lấn
-       Set<Long> findBookedDeviceIdsInTimeRange(
-                     @Param("startTime") LocalDateTime startTime,
-                     @Param("endTime") LocalDateTime endTime);
+    // (API Admin) Lấy tất cả (phân trang)
+    Page<MeetingEntity> findAllByOrderByStartTimeDesc(Pageable pageable);
 
-       Page<MeetingEntity> findAllByOrderByStartTimeDesc(Pageable pageable);
-
-       @Query("SELECT COUNT(m) > 0 FROM MeetingEntity m JOIN m.devices d " +
-                     "WHERE d.id IN :deviceIds " +
-                     "AND m.status != 'CANCELED' " +
-                     "AND m.startTime < :endTime AND m.endTime > :startTime " +
-                     "AND (:ignoreId IS NULL OR m.id != :ignoreId)") // <-- THÊM DÒNG NÀY
-       boolean existsConflictingDevice(
-                     @Param("deviceIds") Set<Long> deviceIds,
-                     @Param("startTime") LocalDateTime startTime,
-                     @Param("endTime") LocalDateTime endTime,
-                     @Param("ignoreId") Long ignoreId // <-- THÊM THAM SỐ NÀY
-       );
+    // Kiểm tra xung đột thiết bị
+    @Query("SELECT COUNT(m) > 0 FROM MeetingEntity m JOIN m.devices d " +
+            "WHERE d.id IN :deviceIds " +
+            "AND m.status != 'CANCELED' " +
+            "AND m.startTime < :endTime AND m.endTime > :startTime " +
+            "AND (:ignoreId IS NULL OR m.id != :ignoreId)") // SỬA LỖI 2: Thêm dấu cách
+    boolean existsConflictingDevice(
+            @Param("deviceIds") Set<Long> deviceIds,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime,
+            @Param("ignoreId") Long ignoreId
+    );
 }
