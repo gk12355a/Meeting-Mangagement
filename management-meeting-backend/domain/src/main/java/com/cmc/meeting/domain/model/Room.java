@@ -19,4 +19,5 @@ public class Room {
     private List<String> fixedDevices; // Các thiết bị cố định (BS-14.2)
     private Set<Role> requiredRoles = new HashSet<>();
     private RoomStatus status = RoomStatus.AVAILABLE;
+    private boolean requiresApproval = false;
 }

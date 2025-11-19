@@ -24,4 +24,5 @@ public class RoomRequest {
     private Set<Role> requiredRoles;
     @NotNull(message = "Trạng thái không được để trống")
     private RoomStatus status;
+    private Boolean requiresApproval;
 }

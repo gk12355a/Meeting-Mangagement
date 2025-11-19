@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 import com.cmc.meeting.domain.model.Role;
+
 @Data
 @Entity
 @Table(name = "meetings")
@@ -32,7 +33,7 @@ public class MeetingEntity {
     private LocalDateTime endTime;
 
     @Enumerated(EnumType.STRING) // Lưu tên của Enum (CONFIRMED, CANCELLED)
-    @Column(nullable = false)
+    @Column(name = "status", length = 50)
     private BookingStatus status;
 
     // --- Quan hệ (Relationships) ---
@@ -57,17 +58,14 @@ public class MeetingEntity {
 
     @Column
     private String cancelReason;
-    
+
     @Column
     private LocalDateTime cancelledAt;
 
     // BỔ SUNG: (US-12)
     @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-        name = "meeting_devices", // Tên bảng trung gian
-        joinColumns = @JoinColumn(name = "meeting_id"),
-        inverseJoinColumns = @JoinColumn(name = "device_id")
-    )
+    @JoinTable(name = "meeting_devices", // Tên bảng trung gian
+            joinColumns = @JoinColumn(name = "meeting_id"), inverseJoinColumns = @JoinColumn(name = "device_id"))
     private Set<DeviceEntity> devices = new HashSet<>();
 
     @Column(nullable = true, length = 36) // UUID

@@ -92,6 +92,10 @@ public class AdminUserServiceImpl implements AdminUserService {
         User userToDelete = userRepository.findById(userIdToDelete)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy user: " + userIdToDelete));
 
+        if (!userToDelete.isActive()) {
+            throw new PolicyViolationException("Người dùng này đã bị vô hiệu hóa trước đó rồi.");
+        }
+
         // 2. Kiểm tra an toàn: Không thể xóa Admin cuối cùng
         if (userToDelete.getRoles().contains(Role.ROLE_ADMIN)) {
             // (Giả sử bạn đã thêm hàm 'countAdmins' vào UserRepository)
