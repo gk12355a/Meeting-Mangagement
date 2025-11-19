@@ -214,6 +214,11 @@ public class MeetingServiceImpl implements MeetingService {
         Room newRoom = roomRepository.findById(request.getRoomId())
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy phòng họp"));
 
+        // --- LOGIC KIỂM TRA THAY ĐỔI ---
+        boolean isRoomChanged = !meeting.getRoom().getId().equals(newRoom.getId());
+        boolean isTimeChanged = !meeting.getStartTime().equals(request.getStartTime()) ||
+                !meeting.getEndTime().equals(request.getEndTime());
+
         Set<User> newParticipantUsers = request.getParticipantIds().stream()
                 .map(id -> userRepository.findById(id)
                         .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy người tham dự với ID: " + id)))
@@ -226,10 +231,10 @@ public class MeetingServiceImpl implements MeetingService {
         Set<String> newGuestEmails = (request.getGuestEmails() != null) ? request.getGuestEmails() : new HashSet<>();
 
         // Kiểm tra quyền và xung đột cho phòng/thời gian MỚI
+        // (Truyền meetingId để bỏ qua chính nó khi check trùng)
         checkAccessAndConflicts(newRoom, meeting.getOrganizer(), newParticipantUsers, newDevices,
                 request.getStartTime(), request.getEndTime(),
-                meetingId // <-- THÊM THAM SỐ NÀY (ID của cuộc họp đang sửa)
-        );
+                meetingId);
 
         // Chuyển đổi sang Set<MeetingParticipant>
         Set<MeetingParticipant> newParticipants = new HashSet<>();
@@ -242,7 +247,7 @@ public class MeetingServiceImpl implements MeetingService {
             }
         });
 
-        // Cập nhật các trường
+        // --- CẬP NHẬT THÔNG TIN CƠ BẢN ---
         meeting.setTitle(request.getTitle());
         meeting.setDescription(request.getDescription());
         meeting.setStartTime(request.getStartTime());
@@ -252,8 +257,52 @@ public class MeetingServiceImpl implements MeetingService {
         meeting.setDevices(newDevices);
         meeting.setGuestEmails(newGuestEmails);
 
+        // --- SỬA LỖI: LOGIC RESET TRẠNG THÁI DUYỆT ---
+        if (newRoom.isRequiresApproval()) {
+            // Nếu phòng là VIP
+            if (isRoomChanged || isTimeChanged) {
+                // Nếu đổi phòng hoặc đổi giờ -> Phải duyệt lại
+                meeting.setStatus(BookingStatus.PENDING_APPROVAL);
+
+                // Gửi thông báo cho Admin
+                notifyAdminsForApproval(meeting, organizer);
+
+                // Thông báo cho người sửa
+                notificationService.createNotification(organizer,
+                        "Do thay đổi phòng/giờ sang khu vực cần duyệt, lịch họp của bạn đã chuyển sang trạng thái CHỜ DUYỆT.",
+                        meeting);
+            }
+            // Nếu chỉ đổi tên/mô tả/người tham gia -> Giữ nguyên trạng thái cũ (không cần
+            // duyệt lại)
+        } else {
+            // Nếu phòng mới là phòng Thường -> Auto Confirm
+            meeting.setStatus(BookingStatus.CONFIRMED);
+        }
+
         Meeting updatedMeeting = meetingRepository.save(meeting);
+
+        // Nếu sau khi update mà là CONFIRMED (tức là chuyển từ VIP -> Thường, hoặc sửa
+        // nhẹ phòng thường)
+        // Thì gửi thông báo cập nhật cho người tham gia
+        if (updatedMeeting.getStatus() == BookingStatus.CONFIRMED) {
+            String updateMsg = "Thông tin cuộc họp '" + updatedMeeting.getTitle() + "' đã được cập nhật.";
+            meeting.getParticipants().stream()
+                    .filter(p -> !p.getUser().getId().equals(currentUserId)) // Trừ người sửa
+                    .forEach(p -> notificationService.createNotification(p.getUser(), updateMsg, updatedMeeting));
+        }
+
         return convertMeetingToDTO(updatedMeeting);
+    }
+
+    private void notifyAdminsForApproval(Meeting meeting, User organizer) {
+        List<User> admins = userRepository.findAllAdmins();
+        String msgToAdmin = String.format(
+                "CẬP NHẬT: Yêu cầu duyệt lại. %s đã thay đổi lịch họp tại phòng '%s'.",
+                organizer.getFullName(),
+                meeting.getRoom().getName());
+        for (User admin : admins) {
+            notificationService.createNotification(admin, msgToAdmin, meeting);
+        }
     }
 
     /**
