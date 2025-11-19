@@ -29,6 +29,7 @@ public class UserRepositoryAdapter implements UserRepository {
         return jpaRepository.findById(id)
                 .map(entity -> modelMapper.map(entity, User.class));
     }
+
     @Override
     public Optional<User> findByUsername(String username) {
         // Lấy UserEntity từ DB
@@ -36,23 +37,26 @@ public class UserRepositoryAdapter implements UserRepository {
         return jpaRepository.findByUsername(username)
                 .map(entity -> modelMapper.map(entity, User.class));
     }
+
     @Override
     public User save(User user) {
         // 1. Map từ Domain Model (User) -> JPA Entity (UserEntity)
         UserEntity userEntity = modelMapper.map(user, UserEntity.class);
-        
+
         // 2. Lưu Entity bằng JpaRepository
         UserEntity savedEntity = jpaRepository.save(userEntity);
-        
+
         // 3. Map ngược từ Entity đã lưu -> Domain Model để trả về
         return modelMapper.map(savedEntity, User.class);
     }
+
     @Override
     public List<User> findAll() {
         return jpaRepository.findAll().stream()
                 .map(entity -> modelMapper.map(entity, User.class))
                 .collect(Collectors.toList());
     }
+
     @Override
     public void delete(User user) {
         // Cần xóa các tham chiếu con trước (Contact Groups)
@@ -63,11 +67,20 @@ public class UserRepositoryAdapter implements UserRepository {
         UserEntity entity = modelMapper.map(user, UserEntity.class);
         jpaRepository.delete(entity);
     }
+
     @Override
     public List<User> searchByNameOrUsername(String query) {
         List<UserEntity> entities = jpaRepository.searchByNameOrUsername(query);
-        
+
         // Map từ List<Entity> sang List<Domain Model>
+        return entities.stream()
+                .map(entity -> modelMapper.map(entity, User.class))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<User> findAllAdmins() {
+        List<UserEntity> entities = jpaRepository.findAllAdmins();
         return entities.stream()
                 .map(entity -> modelMapper.map(entity, User.class))
                 .collect(Collectors.toList());

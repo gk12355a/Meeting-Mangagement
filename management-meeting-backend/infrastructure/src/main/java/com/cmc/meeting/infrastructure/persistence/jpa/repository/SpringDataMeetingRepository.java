@@ -26,9 +26,8 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
 
     // (US-5) Kiểm tra xung đột người tham gia
     @Query("SELECT m FROM MeetingEntity m JOIN m.participants p " +
-            // SỬA LỖI 1: Đổi p.user.id thành p.userId
             "WHERE p.userId IN :userIds " +
-            "AND m.status != 'CANCELED' " +
+            "AND m.status NOT IN ('CANCELLED', 'REJECTED') " +
             "AND m.startTime < :endTime AND m.endTime > :startTime " +
             "AND (:ignoreId IS NULL OR m.id != :ignoreId)")
     List<MeetingEntity> findConflictingMeetingsForUsers(
@@ -42,7 +41,7 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
      */
     @Query("SELECT COUNT(m) > 0 FROM MeetingEntity m " +
             "WHERE m.room.id = :roomId " +
-            "AND m.status != 'CANCELED' " + // Đổi từ 'CONFIRMED' sang '!= CANCELED'
+            "AND m.status NOT IN ('CANCELLED', 'REJECTED') " + // Đổi từ 'CONFIRMED' sang '!= CANCELED'
             "AND m.startTime < :endTime " +
             "AND m.endTime > :startTime " + // SỬA LỖI 2: Thêm dấu cách ở cuối
             "AND (:ignoreId IS NULL OR m.id != :ignoreId)")
@@ -123,7 +122,7 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
 
     // Tìm các thiết bị đã bị đặt
     @Query("SELECT d.id FROM MeetingEntity m JOIN m.devices d " +
-            "WHERE m.status != 'CANCELED' " +
+            "WHERE m.status NOT IN ('CANCELLED', 'REJECTED') " +
             "AND m.startTime < :endTime " +
             "AND m.endTime > :startTime")
     Set<Long> findBookedDeviceIdsInTimeRange(
@@ -136,7 +135,7 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
     // Kiểm tra xung đột thiết bị
     @Query("SELECT COUNT(m) > 0 FROM MeetingEntity m JOIN m.devices d " +
             "WHERE d.id IN :deviceIds " +
-            "AND m.status != 'CANCELED' " +
+            "AND m.status NOT IN ('CANCELLED', 'REJECTED') " +
             "AND m.startTime < :endTime AND m.endTime > :startTime " +
             "AND (:ignoreId IS NULL OR m.id != :ignoreId)") // SỬA LỖI 2: Thêm dấu cách
     boolean existsConflictingDevice(
@@ -148,7 +147,7 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
 
     @Query("SELECT m FROM MeetingEntity m " +
            "WHERE m.organizer.id = :organizerId " +
-           "AND m.status != 'CANCELLED' " +
+           "AND m.status NOT IN ('CANCELLED', 'REJECTED') " +
            "AND m.startTime > :now")
     List<MeetingEntity> findFutureMeetingsByOrganizerId(
             @Param("organizerId") Long organizerId,
@@ -157,7 +156,7 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
 
     @Query("SELECT m FROM MeetingEntity m " +
            "WHERE m.room.id = :roomId " +
-           "AND m.status != 'CANCELED' " +
+           "AND m.status NOT IN ('CANCELLED', 'REJECTED') " +
            "AND m.startTime < :endTime " + // Chồng lấn (Overlap)
            "AND m.endTime > :startTime")   // Chồng lấn (Overlap)
     List<MeetingEntity> findMeetingsByRoomAndTimeRange(
@@ -167,7 +166,7 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
     );
     @Query("SELECT m FROM MeetingEntity m JOIN m.devices d " + // JOIN m.devices d
            "WHERE d.id = :deviceId " +                       // WHERE d.id
-           "AND m.status != 'CANCELED' " +
+           "AND m.status NOT IN ('CANCELLED', 'REJECTED') " +
            "AND m.startTime < :endTime " +
            "AND m.endTime > :startTime")
     List<MeetingEntity> findMeetingsByDeviceAndTimeRange(

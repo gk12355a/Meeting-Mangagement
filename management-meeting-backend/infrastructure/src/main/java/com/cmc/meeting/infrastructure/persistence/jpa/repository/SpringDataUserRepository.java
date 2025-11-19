@@ -1,4 +1,5 @@
 package com.cmc.meeting.infrastructure.persistence.jpa.repository;
+
 import com.cmc.meeting.infrastructure.persistence.jpa.entity.UserEntity;
 
 import io.lettuce.core.dynamic.annotation.Param;
@@ -11,8 +12,12 @@ import org.springframework.data.jpa.repository.Query;
 public interface SpringDataUserRepository extends JpaRepository<UserEntity, Long> {
 
     Optional<UserEntity> findByUsername(String username);
+
     @Query("SELECT u FROM UserEntity u WHERE " +
-           "LOWER(u.fullName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
-           "LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%'))")
+            "LOWER(u.fullName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+            "LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%'))")
     List<UserEntity> searchByNameOrUsername(@Param("query") String query);
+
+    @Query("SELECT u FROM UserEntity u JOIN u.roles r WHERE r = 'ROLE_ADMIN' AND u.isActive = true")
+    List<UserEntity> findAllAdmins();
 }

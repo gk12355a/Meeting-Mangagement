@@ -15,4 +15,5 @@ public class RoomDTO {
     private List<String> fixedDevices;
     private Set<Role> requiredRoles;
     private RoomStatus status;
+    private boolean requiresApproval;
 }
