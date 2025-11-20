@@ -14,6 +14,8 @@ public class MeetingParticipant {
     // BỔ SUNG: Token bí mật cho link email
     private String responseToken; 
 
+    private Meeting meeting;
+
     // CẬP NHẬT CONSTRUCTOR
     public MeetingParticipant(User user, ParticipantStatus status, String responseToken) {
         this.user = user;
