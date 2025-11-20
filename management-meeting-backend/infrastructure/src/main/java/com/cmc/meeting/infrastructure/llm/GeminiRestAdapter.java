@@ -29,7 +29,7 @@ public class GeminiRestAdapter implements LanguageModelPort {
     // Hardcode URL chuẩn của Google để tránh sai sót do ghép chuỗi .env
     // Nếu bước 1 bạn thấy model khác, hãy sửa tên model ở đây
     // Sửa dòng này trong GeminiRestAdapter.java
-private static final String GOOGLE_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+private static final String GOOGLE_API_URL = "";
 
     public GeminiRestAdapter(@Value("${gemini.api.key}") String apiKey, ObjectMapper objectMapper) {
         this.apiKey = apiKey;
