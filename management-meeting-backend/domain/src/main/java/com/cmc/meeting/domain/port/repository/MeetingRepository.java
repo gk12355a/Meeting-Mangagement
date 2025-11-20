@@ -58,4 +58,7 @@ public interface MeetingRepository {
 
     List<Meeting> findMeetingsByRoomAndTimeRange(Long roomId, LocalDateTime startTime, LocalDateTime endTime);
     List<Meeting> findMeetingsByDeviceAndTimeRange(Long deviceId, LocalDateTime startTime, LocalDateTime endTime);
+    List<Meeting> findByStartTimeBetween(LocalDateTime start, LocalDateTime end);
+
+    Optional<Meeting> findCurrentMeetingAtRoom(Long roomId, LocalDateTime checkTime);
 }
