@@ -29,7 +29,6 @@ public class ChatbotController {
             Authentication authentication) {
         
         // 1. Lấy thông tin người dùng đã đăng nhập từ Spring Security
-        // (Đây là lý do API này phải được bảo vệ)
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
         Long currentUserId = userDetails.getId(); 
 

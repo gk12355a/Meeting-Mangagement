@@ -26,7 +26,7 @@ import java.util.List;
 public class ContactGroupController {
 
     private final ContactGroupService groupService;
-    private final UserRepository userRepository; // Dùng để lấy current user
+    private final UserRepository userRepository;
 
     public ContactGroupController(ContactGroupService groupService, UserRepository userRepository) {
         this.groupService = groupService;

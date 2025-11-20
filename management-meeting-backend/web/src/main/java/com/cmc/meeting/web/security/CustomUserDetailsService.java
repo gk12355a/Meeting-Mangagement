@@ -46,9 +46,6 @@ public class CustomUserDetailsService implements UserDetailsService {
         );
     }
 
-    // =================================================================
-    // === BỔ SUNG LỚP NÀY VÀO (LỚP MÀ CHATBOTCONTROLLER CẦN) ===
-    // =================================================================
     public static class CustomUserDetails implements UserDetails {
 
         private final Long id;
@@ -68,7 +65,6 @@ public class CustomUserDetailsService implements UserDetailsService {
             return id;
         }
 
-        // --- Các hàm bắt buộc của interface UserDetails ---
         @Override
         public Collection<? extends GrantedAuthority> getAuthorities() {
             return authorities;
@@ -101,7 +97,7 @@ public class CustomUserDetailsService implements UserDetailsService {
 
         @Override
         public boolean isEnabled() {
-            return true; // Đã check 'isActive' ở hàm loadUserByUsername
+            return true;
         }
     }
 }
