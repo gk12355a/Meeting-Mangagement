@@ -481,6 +481,7 @@ public class MeetingServiceImpl implements MeetingService {
                 devices,
                 guestEmails,
                 seriesId);
+        newMeeting.setCheckinCode(UUID.randomUUID().toString());
 
         // Set trạng thái vừa tính toán
         newMeeting.setStatus(initialStatus);
@@ -637,30 +638,30 @@ public class MeetingServiceImpl implements MeetingService {
      * HELPER 3: Thuật toán tính toán các slot định kỳ (US-3)
      */
     private List<TimeSlotDTO> calculateRecurrenceSlots(LocalDateTime firstStartTime,
-                                                       LocalDateTime firstEndTime,
-                                                       RecurrenceRuleDTO rule) {
+            LocalDateTime firstEndTime,
+            RecurrenceRuleDTO rule) {
         List<TimeSlotDTO> slots = new ArrayList<>();
         long durationMinutes = java.time.Duration.between(firstStartTime, firstEndTime).toMinutes();
 
         // --- TRƯỜNG HỢP 1: LẶP THEO THỨ (WEEKLY + daysOfWeek) ---
-        if (rule.getFrequency() == FrequencyType.WEEKLY 
-                && rule.getDaysOfWeek() != null 
+        if (rule.getFrequency() == FrequencyType.WEEKLY
+                && rule.getDaysOfWeek() != null
                 && !rule.getDaysOfWeek().isEmpty()) {
-            
+
             LocalDate currentDate = firstStartTime.toLocalDate();
             LocalDate endDate = rule.getRepeatUntil();
-            
+
             // Duyệt từng ngày từ ngày bắt đầu đến ngày kết thúc
             while (!currentDate.isAfter(endDate)) {
-                
+
                 // 1. Nếu ngày hiện tại khớp với một trong các thứ đã chọn
                 if (rule.getDaysOfWeek().contains(currentDate.getDayOfWeek())) {
-                    
+
                     // Tạo thời gian bắt đầu và kết thúc cho slot này
                     LocalDateTime slotStart = currentDate.atTime(firstStartTime.toLocalTime());
                     LocalDateTime slotEnd = slotStart.plusMinutes(durationMinutes);
-                    
-                    // (Quan trọng) Chỉ thêm nếu slot này không nằm trước thời gian gốc 
+
+                    // (Quan trọng) Chỉ thêm nếu slot này không nằm trước thời gian gốc
                     // (để tránh lỗi logic nếu ngày bắt đầu không rơi vào thứ được chọn)
                     if (!slotStart.isBefore(firstStartTime)) {
                         slots.add(new TimeSlotDTO(slotStart, slotEnd));
@@ -673,28 +674,28 @@ public class MeetingServiceImpl implements MeetingService {
                     // Nếu interval > 1 (ví dụ 2 tuần 1 lần), ta cần cộng thêm số tuần nghỉ
                     // Interval 1: Cộng 0 tuần (tuần sau họp tiếp)
                     // Interval 2: Cộng 1 tuần (nghỉ 1 tuần)
-                    int weeksToSkip = rule.getInterval() - 1; 
+                    int weeksToSkip = rule.getInterval() - 1;
                     if (weeksToSkip > 0) {
                         currentDate = currentDate.plusWeeks(weeksToSkip);
                     }
                 }
-                
+
                 // Tăng 1 ngày để xét ngày tiếp theo
                 currentDate = currentDate.plusDays(1);
             }
-            
+
             return slots;
         }
 
         // --- TRƯỜNG HỢP 2: LẶP CƠ BẢN (DAILY, MONTHLY, hoặc WEEKLY không chọn thứ) ---
         // Logic cũ giữ nguyên cho các trường hợp đơn giản
         LocalDateTime currentStartTime = firstStartTime;
-        
+
         // Nếu Weekly mà không chọn thứ, mặc định là lặp lại đúng thứ của ngày bắt đầu
         // (Code cũ của bạn đã xử lý việc này bằng 'plusWeeks')
-        
+
         while (!currentStartTime.toLocalDate().isAfter(rule.getRepeatUntil())) {
-            
+
             LocalDateTime currentEndTime = currentStartTime.plusMinutes(durationMinutes);
             slots.add(new TimeSlotDTO(currentStartTime, currentEndTime));
 
@@ -711,7 +712,7 @@ public class MeetingServiceImpl implements MeetingService {
                     break;
                 default:
                     // Tránh vòng lặp vô tận nếu frequency null
-                    currentStartTime = currentStartTime.plusDays(1); 
+                    currentStartTime = currentStartTime.plusDays(1);
             }
         }
         return slots;
@@ -851,6 +852,63 @@ public class MeetingServiceImpl implements MeetingService {
                         meeting.getEndTime(),
                         meeting.getOrganizer().getFullName()))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public void checkInByQrCode(String qrCode, Long currentUserId) {
+        // 1. Tìm cuộc họp theo mã QR
+        Meeting meeting = meetingRepository.findByCheckinCode(qrCode)
+                .orElseThrow(() -> new EntityNotFoundException("Mã QR không hợp lệ hoặc cuộc họp không tồn tại."));
+
+        // --- DEBUG LOG (BẮT LỖI TẠI ĐÂY) ---
+        Long organizerId = meeting.getOrganizer().getId();
+        log.info(">>> DEBUG CHECK-IN: User đang quét = {}, Organizer của họp = {}", currentUserId, organizerId);
+        // -----------------------------------
+
+        // 2. KIỂM TRA THỜI GIAN
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime allowedStart = meeting.getStartTime().minusMinutes(30);
+        LocalDateTime allowedEnd = meeting.getEndTime();
+
+        if (now.isBefore(allowedStart)) {
+            throw new PolicyViolationException("Chưa đến giờ điểm danh (Cổng check-in mở trước giờ họp 30 phút).");
+        }
+        if (now.isAfter(allowedEnd)) {
+            throw new PolicyViolationException("Cuộc họp đã kết thúc, không thể điểm danh nữa.");
+        }
+
+        // 3. KIỂM TRA NGƯỜI DÙNG & LẤY PARTICIPANT
+        MeetingParticipant participant = meeting.getParticipants().stream()
+                .filter(p -> p.getUser().getId().equals(currentUserId))
+                .findFirst()
+                .orElse(null);
+
+        if (participant == null) {
+            // So sánh ID an toàn hơn (dùng .longValue() để tránh lỗi so sánh Object)
+            if (organizerId.longValue() == currentUserId.longValue()) {
+                
+                log.info(">>> Organizer ID {} check-in. Tự động thêm vào danh sách.", currentUserId);
+                
+                participant = new MeetingParticipant(meeting.getOrganizer(), ParticipantStatus.ACCEPTED, null);
+                participant.setMeeting(meeting); 
+                
+                meeting.getParticipants().add(participant);
+            } else {
+                // Nếu code chạy vào đây, hãy xem dòng LOG ở trên để biết tại sao ID không khớp!
+                throw new PolicyViolationException("Bạn không có tên trong danh sách tham dự cuộc họp này.");
+            }
+        }
+
+        // 4. THỰC HIỆN CHECK-IN
+        if (participant.getCheckedInAt() != null) {
+            throw new PolicyViolationException("Bạn đã check-in trước đó rồi (lúc " + 
+                participant.getCheckedInAt().toLocalTime() + ").");
+        }
+
+        participant.setCheckedInAt(now);
+        meetingRepository.save(meeting);
+        
+        log.info("User ID {} đã check-in thành công vào Meeting ID {}", currentUserId, meeting.getId());
     }
 
 }

@@ -257,4 +257,9 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
         // Sửa lỗi logic: Dùng this::toDomain
         return entityOpt.map(this::toDomain);
     }
+    @Override
+    public Optional<Meeting> findByCheckinCode(String checkinCode) {
+        return jpaRepository.findByCheckinCode(checkinCode)
+                .map(entity -> modelMapper.map(entity, Meeting.class));
+    }
 }

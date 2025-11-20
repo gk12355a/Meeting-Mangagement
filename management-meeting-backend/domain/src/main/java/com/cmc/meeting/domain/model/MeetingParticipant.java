@@ -1,5 +1,7 @@
 package com.cmc.meeting.domain.model;
 
+import java.time.LocalDateTime;
+
 import lombok.Data;
 import lombok.NoArgsConstructor;
 // import lombok.AllArgsConstructor; // Bỏ AllArgsConstructor
@@ -15,6 +17,8 @@ public class MeetingParticipant {
     private String responseToken; 
 
     private Meeting meeting;
+
+    private LocalDateTime checkedInAt;
 
     // CẬP NHẬT CONSTRUCTOR
     public MeetingParticipant(User user, ParticipantStatus status, String responseToken) {

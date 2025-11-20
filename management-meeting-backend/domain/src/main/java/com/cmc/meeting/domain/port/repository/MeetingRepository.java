@@ -61,4 +61,5 @@ public interface MeetingRepository {
     List<Meeting> findByStartTimeBetween(LocalDateTime start, LocalDateTime end);
 
     Optional<Meeting> findCurrentMeetingAtRoom(Long roomId, LocalDateTime checkTime);
+    Optional<Meeting> findByCheckinCode(String checkinCode);
 }

@@ -23,6 +23,7 @@ public class MeetingDTO {
     private UserDTO creator;
     private UserDTO organizer;
     private List<MeetingParticipantDTO> participants;
+    private String checkinCode;
 
     // ----- Các DTO lồng nhau (Nested DTOs) -----
     // (Để đơn giản, chúng ta định nghĩa tạm ở đây)
