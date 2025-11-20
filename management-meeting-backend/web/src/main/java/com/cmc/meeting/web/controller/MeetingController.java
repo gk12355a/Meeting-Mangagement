@@ -18,6 +18,7 @@ import org.springframework.data.domain.Sort;
 // -------------------------
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 
 import org.springframework.data.domain.Page;
@@ -30,6 +31,7 @@ import com.cmc.meeting.application.dto.timeslot.TimeSlotDTO; // Bổ sung
 import com.cmc.meeting.application.dto.timeslot.TimeSuggestionRequest; // Bổ sung
 import com.cmc.meeting.application.port.service.TimeSuggestionService; // Bổ sung
 import java.util.List; // Bổ sung
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/meetings")
@@ -267,6 +269,32 @@ public class MeetingController {
                                 seriesId, request, currentUser.getId());
 
                 return ResponseEntity.ok(firstMeeting);
+        }
+
+        @PostMapping("/check-in/qr")
+        @Operation(summary = "Check-in tham dự cuộc họp bằng mã QR")
+        public ResponseEntity<String> checkInByQr(
+                        @RequestBody Map<String, String> payload,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                String qrCode = payload.get("qrCode");
+                if (qrCode == null || qrCode.isBlank()) {
+                        return ResponseEntity.badRequest().body("Mã QR không được để trống.");
+                }
+
+                // Lấy ID người đang quét mã
+                Long userId = getUserId(userDetails); // Sử dụng hàm helper getUserId có sẵn trong controller
+
+                // Gọi Service xử lý
+                meetingService.checkInByQrCode(qrCode, userId);
+
+                return ResponseEntity.ok("Check-in thành công! Chào mừng bạn vào họp.");
+        }
+
+        private Long getUserId(UserDetails userDetails) {
+                User user = userRepository.findByUsername(userDetails.getUsername())
+                                .orElseThrow(() -> new EntityNotFoundException("User không tồn tại (Token invalid)"));
+                return user.getId();
         }
 
 }

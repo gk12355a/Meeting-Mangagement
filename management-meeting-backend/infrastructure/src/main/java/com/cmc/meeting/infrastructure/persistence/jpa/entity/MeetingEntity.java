@@ -82,4 +82,6 @@ public class MeetingEntity {
     @Column(name = "email", nullable = false)
     private Set<String> guestEmails = new HashSet<>();
 
+    @Column(name = "checkin_code", unique = true)
+    private String checkinCode;
 }
