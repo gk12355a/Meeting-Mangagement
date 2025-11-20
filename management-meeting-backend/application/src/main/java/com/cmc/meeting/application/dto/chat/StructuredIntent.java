@@ -16,7 +16,8 @@ public class StructuredIntent {
     private LocalDateTime startTime;
     private LocalDateTime endTime;
     private String title;
-
+    
+    private String roomName;
     // Dùng cho intent "UNKNOWN" hoặc khi có lỗi
     private String reply; 
 }

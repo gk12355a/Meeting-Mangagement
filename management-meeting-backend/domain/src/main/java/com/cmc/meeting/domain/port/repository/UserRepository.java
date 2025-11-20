@@ -13,4 +13,6 @@ public interface UserRepository {
     List<User> findAll();
     void delete(User user);
     List<User> searchByNameOrUsername(String query);
+
+    List<User> findByFullNameContainingIgnoreCase(String fullName);
 }

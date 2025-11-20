@@ -15,4 +15,6 @@ public interface RoomRepository {
 
     void deleteById(Long id);
     List<Room> findAvailableRooms(LocalDateTime startTime, LocalDateTime endTime, int capacity);
+
+    Optional<Room> findByNameContainingIgnoreCase(String name);
 }
