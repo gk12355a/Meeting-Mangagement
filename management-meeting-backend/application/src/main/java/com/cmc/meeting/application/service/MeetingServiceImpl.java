@@ -9,6 +9,7 @@ import com.cmc.meeting.application.dto.request.MeetingUpdateRequest;
 import com.cmc.meeting.application.dto.response.BookedSlotDTO;
 import com.cmc.meeting.application.dto.response.MeetingDTO;
 import com.cmc.meeting.application.dto.response.MeetingParticipantDTO;
+import com.cmc.meeting.application.dto.recurrence.FrequencyType;
 import com.cmc.meeting.application.dto.recurrence.RecurrenceRuleDTO;
 import com.cmc.meeting.application.dto.timeslot.TimeSlotDTO;
 
@@ -38,6 +39,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -635,15 +637,64 @@ public class MeetingServiceImpl implements MeetingService {
      * HELPER 3: Thuật toán tính toán các slot định kỳ (US-3)
      */
     private List<TimeSlotDTO> calculateRecurrenceSlots(LocalDateTime firstStartTime,
-            LocalDateTime firstEndTime,
-            RecurrenceRuleDTO rule) {
+                                                       LocalDateTime firstEndTime,
+                                                       RecurrenceRuleDTO rule) {
         List<TimeSlotDTO> slots = new ArrayList<>();
         long durationMinutes = java.time.Duration.between(firstStartTime, firstEndTime).toMinutes();
 
+        // --- TRƯỜNG HỢP 1: LẶP THEO THỨ (WEEKLY + daysOfWeek) ---
+        if (rule.getFrequency() == FrequencyType.WEEKLY 
+                && rule.getDaysOfWeek() != null 
+                && !rule.getDaysOfWeek().isEmpty()) {
+            
+            LocalDate currentDate = firstStartTime.toLocalDate();
+            LocalDate endDate = rule.getRepeatUntil();
+            
+            // Duyệt từng ngày từ ngày bắt đầu đến ngày kết thúc
+            while (!currentDate.isAfter(endDate)) {
+                
+                // 1. Nếu ngày hiện tại khớp với một trong các thứ đã chọn
+                if (rule.getDaysOfWeek().contains(currentDate.getDayOfWeek())) {
+                    
+                    // Tạo thời gian bắt đầu và kết thúc cho slot này
+                    LocalDateTime slotStart = currentDate.atTime(firstStartTime.toLocalTime());
+                    LocalDateTime slotEnd = slotStart.plusMinutes(durationMinutes);
+                    
+                    // (Quan trọng) Chỉ thêm nếu slot này không nằm trước thời gian gốc 
+                    // (để tránh lỗi logic nếu ngày bắt đầu không rơi vào thứ được chọn)
+                    if (!slotStart.isBefore(firstStartTime)) {
+                        slots.add(new TimeSlotDTO(slotStart, slotEnd));
+                    }
+                }
+
+                // 2. Xử lý nhảy tuần (Interval)
+                // Nếu hôm nay là CHỦ NHẬT, ta cần kiểm tra xem có cần nhảy cóc tuần không
+                if (currentDate.getDayOfWeek() == java.time.DayOfWeek.SUNDAY) {
+                    // Nếu interval > 1 (ví dụ 2 tuần 1 lần), ta cần cộng thêm số tuần nghỉ
+                    // Interval 1: Cộng 0 tuần (tuần sau họp tiếp)
+                    // Interval 2: Cộng 1 tuần (nghỉ 1 tuần)
+                    int weeksToSkip = rule.getInterval() - 1; 
+                    if (weeksToSkip > 0) {
+                        currentDate = currentDate.plusWeeks(weeksToSkip);
+                    }
+                }
+                
+                // Tăng 1 ngày để xét ngày tiếp theo
+                currentDate = currentDate.plusDays(1);
+            }
+            
+            return slots;
+        }
+
+        // --- TRƯỜNG HỢP 2: LẶP CƠ BẢN (DAILY, MONTHLY, hoặc WEEKLY không chọn thứ) ---
+        // Logic cũ giữ nguyên cho các trường hợp đơn giản
         LocalDateTime currentStartTime = firstStartTime;
-
+        
+        // Nếu Weekly mà không chọn thứ, mặc định là lặp lại đúng thứ của ngày bắt đầu
+        // (Code cũ của bạn đã xử lý việc này bằng 'plusWeeks')
+        
         while (!currentStartTime.toLocalDate().isAfter(rule.getRepeatUntil())) {
-
+            
             LocalDateTime currentEndTime = currentStartTime.plusMinutes(durationMinutes);
             slots.add(new TimeSlotDTO(currentStartTime, currentEndTime));
 
@@ -658,6 +709,9 @@ public class MeetingServiceImpl implements MeetingService {
                 case MONTHLY:
                     currentStartTime = currentStartTime.plusMonths(rule.getInterval());
                     break;
+                default:
+                    // Tránh vòng lặp vô tận nếu frequency null
+                    currentStartTime = currentStartTime.plusDays(1); 
             }
         }
         return slots;
