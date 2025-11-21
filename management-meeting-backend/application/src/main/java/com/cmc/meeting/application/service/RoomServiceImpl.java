@@ -54,6 +54,9 @@ public class RoomServiceImpl implements RoomService {
         existingRoom.setFixedDevices(request.getFixedDevices());
         existingRoom.setRequiredRoles(request.getRequiredRoles());
         existingRoom.setStatus(request.getStatus());
+        if (request.getRequiresApproval() != null) {
+            existingRoom.setRequiresApproval(request.getRequiresApproval());
+        }
         Room updatedRoom = roomRepository.save(existingRoom);
         return modelMapper.map(updatedRoom, RoomDTO.class);
     }
