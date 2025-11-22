@@ -40,4 +40,5 @@ public interface MeetingService {
     List<BookedSlotDTO> getDeviceSchedule(Long deviceId, LocalDateTime startTime, LocalDateTime endTime);
     void processMeetingApproval(Long meetingId, boolean isApproved, String reason, Long currentAdminId);
     void checkInByQrCode(String qrCode, Long currentUserId);
+    String generateGoogleCalendarLink(Long meetingId);
 }

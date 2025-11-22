@@ -29,5 +29,10 @@ public class UserEntity {
     private Set<Role> roles = new HashSet<>();
     @Column(nullable = false, columnDefinition = "BIT(1) DEFAULT 1")
     private boolean isActive = true;
-  
+    @Column(name = "google_refresh_token", columnDefinition = "TEXT")
+    private String googleRefreshToken; // Quan trọng: Dùng để lấy token mới khi hết hạn
+
+    @Column(name = "is_google_linked")
+    private boolean isGoogleLinked = false;
+
 }
