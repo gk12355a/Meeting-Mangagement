@@ -2,9 +2,11 @@ package com.cmc.meeting.infrastructure.notification;
 
 import com.cmc.meeting.application.port.notification.EmailNotificationPort;
 import com.cmc.meeting.application.port.service.AppConfigService;
+import com.cmc.meeting.domain.model.Meeting;
 import com.cmc.meeting.domain.model.User; // Bổ sung
 import jakarta.mail.internet.MimeMessage;
 
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -31,14 +33,13 @@ public class EmailNotificationAdapter implements EmailNotificationPort {
         try {
             MimeMessage mimeMessage = javaMailSender.createMimeMessage();
             
-            // === SỬA LỖI Ở ĐÂY ===
             // Tham số boolean (multipart) phải đứng TRƯỚC String (encoding)
             MimeMessageHelper helper = new MimeMessageHelper(
                     mimeMessage, 
                     true,     // <-- 1. multipart (boolean)
                     "UTF-8"   // <-- 2. Mã hóa (String)
             );
-            // === KẾT THÚC SỬA ===
+
 
             helper.setTo(to);
             helper.setSubject(subject);
@@ -92,5 +93,39 @@ public class EmailNotificationAdapter implements EmailNotificationPort {
 
         // 4. Gửi email
         this.sendHtmlEmail(user.getUsername(), subject, htmlBody);
+    }
+    // Gửi nhắc nhở (Dùng chung cho cả User nội bộ và Guest)
+    @Override
+    public void sendMeetingReminder(String toEmail, Meeting meeting, String timeLabel) {
+        try {
+            // 1. Định nghĩa key template (Cần thêm vào DB/Config)
+            final String TEMPLATE_KEY = "email.template.meeting-reminder";
+            final String subject = "Nhắc nhở: Cuộc họp sắp diễn ra - " + meeting.getTitle();
+
+            // 2. Format dữ liệu
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
+            String baseUrl = appConfigService.getValue("frontend.base-url", "http://localhost:5173");
+            
+            String organizerName = (meeting.getOrganizer() != null) ? meeting.getOrganizer().getFullName() : "Ban tổ chức";
+
+            // 3. Đóng gói biến
+            Map<String, Object> variables = new HashMap<>();
+            variables.put("title", meeting.getTitle());
+            variables.put("timeLabel", timeLabel); // "15 phút" hoặc "30 phút"
+            variables.put("roomName", meeting.getRoom().getName());
+            variables.put("startTime", meeting.getStartTime().format(formatter));
+            variables.put("endTime", meeting.getEndTime().format(formatter));
+            variables.put("organizer", organizerName);
+            variables.put("meetingUrl", baseUrl + "/meetings/" + meeting.getId());
+
+            // 4. Xử lý template (Giống hệt các hàm trên)
+            String htmlBody = thymeleafService.processTemplate(TEMPLATE_KEY, variables);
+
+            // 5. Gửi
+            this.sendHtmlEmail(toEmail, subject, htmlBody);
+
+        } catch (Exception e) {
+            System.err.println("Lỗi gửi email nhắc nhở tới " + toEmail + ": " + e.getMessage());
+        }
     }
 }
