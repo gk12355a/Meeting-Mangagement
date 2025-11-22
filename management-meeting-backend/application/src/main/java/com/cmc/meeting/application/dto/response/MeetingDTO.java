@@ -17,6 +17,7 @@ public class MeetingDTO {
     private LocalDateTime startTime;
     private LocalDateTime endTime;
     private BookingStatus status;
+    private String seriesId;
 
     // Trả về thông tin chi tiết (chúng ta sẽ tạo UserDTO và RoomDTO sau)
     private RoomDTO room;
