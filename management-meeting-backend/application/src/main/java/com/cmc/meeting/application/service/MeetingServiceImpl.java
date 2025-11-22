@@ -39,8 +39,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -886,12 +890,12 @@ public class MeetingServiceImpl implements MeetingService {
         if (participant == null) {
             // So sánh ID an toàn hơn (dùng .longValue() để tránh lỗi so sánh Object)
             if (organizerId.longValue() == currentUserId.longValue()) {
-                
+
                 log.info(">>> Organizer ID {} check-in. Tự động thêm vào danh sách.", currentUserId);
-                
+
                 participant = new MeetingParticipant(meeting.getOrganizer(), ParticipantStatus.ACCEPTED, null);
-                participant.setMeeting(meeting); 
-                
+                participant.setMeeting(meeting);
+
                 meeting.getParticipants().add(participant);
             } else {
                 // Nếu code chạy vào đây, hãy xem dòng LOG ở trên để biết tại sao ID không khớp!
@@ -901,14 +905,57 @@ public class MeetingServiceImpl implements MeetingService {
 
         // 4. THỰC HIỆN CHECK-IN
         if (participant.getCheckedInAt() != null) {
-            throw new PolicyViolationException("Bạn đã check-in trước đó rồi (lúc " + 
-                participant.getCheckedInAt().toLocalTime() + ").");
+            throw new PolicyViolationException("Bạn đã check-in trước đó rồi (lúc " +
+                    participant.getCheckedInAt().toLocalTime() + ").");
         }
 
         participant.setCheckedInAt(now);
         meetingRepository.save(meeting);
-        
+
         log.info("User ID {} đã check-in thành công vào Meeting ID {}", currentUserId, meeting.getId());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public String generateGoogleCalendarLink(Long meetingId) {
+        Meeting meeting = meetingRepository.findById(meetingId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy cuộc họp: " + meetingId));
+
+        // 1. Format thời gian sang chuẩn UTC của Google (yyyyMMddTHHmmssZ)
+        // Lưu ý: Cần chuyển đổi giờ hệ thống (Local) sang UTC
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
+                .withZone(ZoneId.of("UTC"));
+
+        String startUtc = formatter.format(meeting.getStartTime().atZone(ZoneId.systemDefault()).toInstant());
+        String endUtc = formatter.format(meeting.getEndTime().atZone(ZoneId.systemDefault()).toInstant());
+
+        // 2. Chuẩn bị dữ liệu và Encode URL (để xử lý dấu cách, tiếng Việt...)
+        String title = encodeValue(meeting.getTitle());
+        String details = encodeValue(meeting.getDescription() != null ? meeting.getDescription() : "");
+        String location = encodeValue(meeting.getRoom().getName());
+
+        // Thêm tên người tổ chức vào mô tả (nếu cần)
+        if (meeting.getOrganizer() != null) {
+            String orgInfo = "\n\nNgười tổ chức: " + meeting.getOrganizer().getFullName();
+            details += encodeValue(orgInfo);
+        }
+
+        // 3. Tạo URL theo format của Google
+        // Format:
+        // https://calendar.google.com/calendar/render?action=TEMPLATE&text=...&dates=...&details=...&location=...
+        return String.format(
+                "https://calendar.google.com/calendar/render?action=TEMPLATE&text=%s&dates=%s/%s&details=%s&location=%s",
+                title,
+                startUtc,
+                endUtc,
+                details,
+                location);
+    }
+
+    // Helper để Encode URL (ví dụ: dấu cách thành %20)
+    private String encodeValue(String value) {
+        if (value == null)
+            return "";
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
 }

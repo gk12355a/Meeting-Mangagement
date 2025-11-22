@@ -18,4 +18,6 @@ public class User {
     private String password;
     private Set<Role> roles = new HashSet<>();
     private boolean isActive = true; // us-18
+    private String googleRefreshToken;
+    private boolean isGoogleLinked = false;
 }
