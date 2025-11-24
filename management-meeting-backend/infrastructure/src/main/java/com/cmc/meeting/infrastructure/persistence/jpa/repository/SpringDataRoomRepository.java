@@ -1,5 +1,6 @@
 package com.cmc.meeting.infrastructure.persistence.jpa.repository;
 
+import com.cmc.meeting.infrastructure.persistence.jpa.entity.MeetingEntity;
 import com.cmc.meeting.infrastructure.persistence.jpa.entity.RoomEntity;
 import org.springframework.data.repository.query.Param; // <--- SỬA IMPORT
 import org.springframework.data.jpa.repository.JpaRepository;

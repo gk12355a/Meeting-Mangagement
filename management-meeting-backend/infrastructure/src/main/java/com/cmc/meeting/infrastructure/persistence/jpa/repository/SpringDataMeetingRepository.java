@@ -135,4 +135,5 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
                      @Param("deviceIds") Set<Long> deviceIds,
                      @Param("startTime") LocalDateTime startTime,
                      @Param("endTime") LocalDateTime endTime);
+       List<MeetingEntity> findByOrganizerIdAndStartTime(Long organizerId, LocalDateTime startTime);
 }

@@ -36,4 +36,5 @@ public interface MeetingRepository {
     Set<Long> findBookedDevicesInTimeRange(LocalDateTime startTime, LocalDateTime endTime);
     Page<Meeting> findAllMeetings(Pageable pageable);
     boolean isDeviceBusy(Set<Long> deviceIds, LocalDateTime startTime, LocalDateTime endTime);
+    List<Meeting> findByOrganizerIdAndStartTime(Long organizerId, LocalDateTime startTime);
 }

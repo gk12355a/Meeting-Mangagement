@@ -8,16 +8,12 @@ import java.time.LocalDateTime;
 // Bỏ qua các trường lạ mà LLM có thể trả về
 @JsonIgnoreProperties(ignoreUnknown = true) 
 public class StructuredIntent {
-
-    // "SCHEDULE_MEETING", "SUGGEST_ROOM", "UNKNOWN"
     private String intent; 
-
     private Integer participants;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
     private String title;
-    
     private String roomName;
-    // Dùng cho intent "UNKNOWN" hoặc khi có lỗi
     private String reply; 
+    private String cancelReason;
 }

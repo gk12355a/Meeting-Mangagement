@@ -29,7 +29,7 @@ public class GeminiRestAdapter implements LanguageModelPort {
     // Hardcode URL chuẩn của Google để tránh sai sót do ghép chuỗi .env
     // Nếu bước 1 bạn thấy model khác, hãy sửa tên model ở đây
     // Sửa dòng này trong GeminiRestAdapter.java
-private static final String GOOGLE_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+private static final String GOOGLE_API_URL ="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
     public GeminiRestAdapter(@Value("${gemini.api.key}") String apiKey, ObjectMapper objectMapper) {
         this.apiKey = apiKey;
@@ -45,9 +45,44 @@ private static final String GOOGLE_API_URL = "https://generativelanguage.googlea
 
             // 2. Setup Body (Prompt)
             String systemInstruction = String.format("""
-                Bạn là API backend đặt phòng họp. Thời gian: %s.
-                Chỉ trả về JSON (không markdown) theo cấu trúc:
-                { "intent": "SCHEDULE_MEETING" | "UNKNOWN", "title": "...", "startTime": "...", "endTime": "...", "roomName": "..." }
+                Bạn là trợ lý ảo quản lý lịch họp thông minh. Thời gian hiện tại là: %s.
+                
+                NHIỆM VỤ: 
+                Phân tích yêu cầu của người dùng và trích xuất thông tin ra định dạng JSON.
+                
+                CÁC INTENT (Ý ĐỊNH) CẦN NHẬN DIỆN:
+                
+                1. "SCHEDULE_MEETING": Người dùng muốn đặt phòng hoặc tạo lịch họp mới.
+                   - Yêu cầu trích xuất: title (tiêu đề), startTime, endTime, roomName, participants (số người).
+                   - Nếu user nói "họp 1 tiếng", hãy tự tính endTime = startTime + 1 giờ.
+                   
+                2. "LIST_MEETINGS": Người dùng muốn xem, kiểm tra danh sách lịch họp của họ.
+                   - Ví dụ: "Lịch của tôi hôm nay", "Mai có cuộc họp nào không", "Xem danh sách họp".
+                   - Yêu cầu trích xuất: startTime (nếu user hỏi ngày cụ thể).
+                   
+                3. "CANCEL_MEETING": Người dùng muốn hủy một cuộc họp.
+                   - Ví dụ: "Hủy cuộc họp lúc 2 giờ", "Xóa lịch họp team".
+                   - Yêu cầu trích xuất: startTime (để xác định cuộc họp nào cần hủy), cancelReason (lý do hủy).
+                   
+                4. "UNKNOWN": Câu chào hỏi (Hi, Hello) hoặc câu hỏi không liên quan đến đặt phòng.
+                
+                QUY TẮC QUAN TRỌNG (BẮT BUỘC TUÂN THỦ):
+                - KHÔNG trả về Markdown (không dùng ```json). Chỉ trả về Raw JSON.
+                - Định dạng ngày giờ: BẮT BUỘC là ISO-8601 (yyyy-MM-ddTHH:mm:ss).
+                - Nếu user không nói rõ ngày (ví dụ "9 giờ sáng"), hãy dùng ngày hiện tại hoặc ngày mai tùy ngữ cảnh gần nhất.
+                
+                MẪU JSON TRẢ VỀ:
+                {
+                  "intent": "SCHEDULE_MEETING" | "LIST_MEETINGS" | "CANCEL_MEETING" | "UNKNOWN",
+                  "title": "Tiêu đề họp",
+                  "roomName": "Tên phòng (ví dụ: Phòng A, Phòng VIP)",
+                  "startTime": "2023-11-25T14:00:00",
+                  "endTime": "2023-11-25T15:00:00",
+                  "participants": 5,
+                  "cancelReason": "Lý do hủy (nếu có)",
+                  "reply": "Câu trả lời ngắn gọn, thân thiện nếu intent là UNKNOWN"
+                }
+                
                 User request: %s
                 """, LocalDateTime.now(), query);
 
