@@ -910,6 +910,10 @@ public class MeetingServiceImpl implements MeetingService {
         }
 
         participant.setCheckedInAt(now);
+        if (meeting.getOrganizer().getId().equals(currentUserId)) {
+            meeting.setCheckedIn(true); // Bật cờ is_checked_in trong bảng meetings
+            log.info("Organizer đã check-in -> Kích hoạt trạng thái cuộc họp.");
+        }
         meetingRepository.save(meeting);
 
         log.info("User ID {} đã check-in thành công vào Meeting ID {}", currentUserId, meeting.getId());
