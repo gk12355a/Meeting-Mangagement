@@ -9,7 +9,7 @@ import com.cmc.meeting.domain.port.repository.UserRepository;
 import com.cmc.meeting.infrastructure.persistence.jpa.entity.DeviceEntity;
 import com.cmc.meeting.infrastructure.persistence.jpa.entity.MeetingEntity;
 import com.cmc.meeting.infrastructure.persistence.jpa.embeddable.EmbeddableParticipant;
-import com.cmc.meeting.infrastructure.persistence.jpa.repository.SpringDataMeetingRepository;
+import com.cmc.meeting.infrastructure.persistence.jpa.repository.*;
 import jakarta.annotation.PostConstruct;
 
 import org.modelmapper.ModelMapper;
@@ -20,15 +20,14 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Repository
 public class MeetingRepositoryAdapter implements MeetingRepository {
 
-    private final SpringDataMeetingRepository jpaRepository; // Tên biến chuẩn
+    private final SpringDataMeetingRepository jpaRepository;
     private final ModelMapper modelMapper;
     private final UserRepository userRepository;
 
@@ -71,24 +70,51 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
                 .collect(Collectors.toList());
     }
 
-    // --- CÁC HÀM HELPER ---
+    // --- CÁC HÀM HELPER (ĐÃ SỬA LỖI MAPPING) ---
 
     private Meeting toDomain(MeetingEntity entity) {
         if (entity == null) return null;
 
-        // 1. Map các trường đơn giản (Title, Time, Room...)
+        // 1. Map các trường đơn giản
         Meeting meeting = modelMapper.map(entity, Meeting.class);
 
-        // 2. Map thủ công 'participants' (Vì ModelMapper đã skip trong @PostConstruct)
-        if (entity.getParticipants() != null) {
+        // 2. Map 'participants' (ĐÃ TỐI ƯU QUERY & SỬA LỖI MAPPING)
+        if (entity.getParticipants() != null && !entity.getParticipants().isEmpty()) {
+            
+            // B1: Lấy danh sách tất cả User ID để query 1 lần
+            Set<Long> userIds = entity.getParticipants().stream()
+                    .map(EmbeddableParticipant::getUserId)
+                    .collect(Collectors.toSet());
+
+            // B2: Query 1 lần (giả sử UserRepository trả về List<User>)
+            // Nếu findAllById trả về Iterable, cần ép kiểu hoặc dùng Stream
+            List<User> users = userRepository.findAllById(userIds); // Cần đảm bảo UserRepository có hàm này
+
+            // B3: Tạo Map để tra cứu nhanh
+            Map<Long, User> userMap = users.stream()
+                    .collect(Collectors.toMap(User::getId, Function.identity()));
+
+            // B4: Map sang Domain Object
             Set<MeetingParticipant> participants = entity.getParticipants().stream()
                     .map(embeddable -> {
-                        User user = userRepository.findById(embeddable.getUserId()).orElse(null);
-                        if (user == null) return null;
-                        return new MeetingParticipant(user, embeddable.getStatus(), embeddable.getResponseToken());
+                        User user = userMap.get(embeddable.getUserId());
+                        if (user == null) return null; // Skip nếu user không tồn tại
+                        
+                        MeetingParticipant p = new MeetingParticipant(user, embeddable.getStatus(), embeddable.getResponseToken());
+                        
+                        // === SỬA LỖI 1: MAP THỜI GIAN CHECK-IN TỪ DB LÊN ===
+                        if (embeddable.getCheckedInAt() != null) {
+                            p.setCheckedInAt(embeddable.getCheckedInAt());
+                        }
+                        // ===================================================
+
+                        // Liên kết ngược (nếu cần thiết cho logic save sau này)
+                        p.setMeeting(meeting);
+                        return p;
                     })
-                    .filter(p -> p != null)
+                    .filter(Objects::nonNull)
                     .collect(Collectors.toSet());
+
             meeting.setParticipants(participants);
         }
 
@@ -106,6 +132,13 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
                         embeddable.setUserId(participant.getUser().getId());
                         embeddable.setStatus(participant.getStatus());
                         embeddable.setResponseToken(participant.getResponseToken());
+                        
+                        // === SỬA LỖI 2: MAP THỜI GIAN CHECK-IN XUỐNG DB ===
+                        if (participant.getCheckedInAt() != null) {
+                            embeddable.setCheckedInAt(participant.getCheckedInAt());
+                        }
+                        // ===================================================
+                        
                         return embeddable;
                     })
                     .collect(Collectors.toSet());
@@ -153,7 +186,7 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
     @PostConstruct
     public void configureMapper() {
         TypeMap<MeetingEntity, Meeting> entityToDomainMap = modelMapper.typeMap(MeetingEntity.class, Meeting.class);
-        // QUAN TRỌNG: Skip để map thủ công trong toDomain()
+        // Skip để map thủ công trong toDomain()
         entityToDomainMap.addMappings(mapper -> mapper.skip(Meeting::setParticipants)); 
 
         TypeMap<Meeting, MeetingEntity> domainToEntityMap = modelMapper.typeMap(Meeting.class, MeetingEntity.class);
@@ -192,7 +225,7 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
     public List<Meeting> findConflictingMeetingsForUsers(Set<Long> userIds, LocalDateTime startTime, LocalDateTime endTime, Long meetingIdToIgnore) {
         List<MeetingEntity> entities = jpaRepository.findConflictingMeetingsForUsers(userIds, startTime, endTime, meetingIdToIgnore);
         return entities.stream()
-                .map(this::toDomain) // Dùng toDomain thay vì map trực tiếp để đảm bảo nhất quán
+                .map(this::toDomain)
                 .collect(Collectors.toList());
     }
 
@@ -204,7 +237,7 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
     @Override
     public Page<Meeting> findAllMeetings(Pageable pageable) {
         Page<MeetingEntity> page = jpaRepository.findAllByOrderByStartTimeDesc(pageable);
-        return page.map(this::toDomain); // Dùng toDomain
+        return page.map(this::toDomain);
     }
 
     @Override
@@ -236,30 +269,25 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
                 .collect(Collectors.toList());
     }
 
-    // --- ĐÃ SỬA 2 HÀM MỚI DƯỚI ĐÂY ---
-
     @Override
     public List<Meeting> findByStartTimeBetween(LocalDateTime start, LocalDateTime end) {
-        // Sửa lỗi tên biến: springDataMeetingRepository -> jpaRepository
+        // Gọi hàm findAllByStartTimeBetween vừa thêm ở Bước 1
         List<MeetingEntity> entities = jpaRepository.findAllByStartTimeBetween(start, end);
         
-        // Sửa lỗi logic: Dùng this::toDomain thay vì modelMapper.map để lấy được participants
         return entities.stream()
-                .map(this::toDomain) 
+                .map(this::toDomain) // Sử dụng hàm helper toDomain của bạn
                 .collect(Collectors.toList());
     }
-
     @Override
     public Optional<Meeting> findCurrentMeetingAtRoom(Long roomId, LocalDateTime checkTime) {
-        // Sửa lỗi tên biến: springDataMeetingRepository -> jpaRepository
-        Optional<MeetingEntity> entityOpt = jpaRepository.findActiveMeetingInRoom(roomId, checkTime);
-        
-        // Sửa lỗi logic: Dùng this::toDomain
-        return entityOpt.map(this::toDomain);
+        // Gọi hàm findActiveMeetingInRoom vừa thêm ở Bước 1
+        return jpaRepository.findActiveMeetingInRoom(roomId, checkTime)
+                .map(this::toDomain);
     }
+
     @Override
     public Optional<Meeting> findByCheckinCode(String checkinCode) {
         return jpaRepository.findByCheckinCode(checkinCode)
-                .map(entity -> modelMapper.map(entity, Meeting.class));
+                .map(this::toDomain); // Dùng toDomain thay vì ModelMapper thuần
     }
 }

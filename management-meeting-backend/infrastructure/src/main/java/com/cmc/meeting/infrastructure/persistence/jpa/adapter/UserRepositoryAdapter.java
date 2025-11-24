@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Repository // Đánh dấu đây là 1 Bean của Spring
@@ -56,6 +57,12 @@ public class UserRepositoryAdapter implements UserRepository {
                 .map(entity -> modelMapper.map(entity, User.class))
                 .collect(Collectors.toList());
     }
+    @Override
+    public List<User> findAllById(Set<Long> ids) {
+        return jpaRepository.findAllById(ids).stream()
+                .map(entity -> modelMapper.map(entity, User.class))
+                .collect(Collectors.toList());
+    }
 
     @Override
     public void delete(User user) {
@@ -85,4 +92,5 @@ public class UserRepositoryAdapter implements UserRepository {
                 .map(entity -> modelMapper.map(entity, User.class))
                 .collect(Collectors.toList());
     }
+    
 }
