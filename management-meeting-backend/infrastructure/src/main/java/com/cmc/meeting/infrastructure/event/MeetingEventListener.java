@@ -1,7 +1,9 @@
 package com.cmc.meeting.infrastructure.event;
 
 import com.cmc.meeting.application.port.notification.EmailNotificationPort;
+import com.cmc.meeting.domain.event.MeetingCancelledEvent;
 import com.cmc.meeting.domain.event.MeetingCreatedEvent;
+import com.cmc.meeting.domain.event.MeetingUpdatedEvent;
 import com.cmc.meeting.domain.model.Meeting;
 import com.cmc.meeting.domain.model.MeetingParticipant;
 import com.cmc.meeting.domain.model.ParticipantStatus;
@@ -73,6 +75,43 @@ public class MeetingEventListener {
             log.info("Đã gọi đồng bộ Google Calendar cho Organizer.");
         } catch (Exception e) {
             log.error("Lỗi khi đồng bộ Google Calendar: ", e);
+        }
+    }
+
+    @Async
+    @TransactionalEventListener
+    public void handleMeetingCancellation(MeetingCancelledEvent event) {
+        log.info("EVENT RECEIVED: Hủy cuộc họp ID {}, Google ID: {}", event.getMeetingId(), event.getGoogleEventId());
+        
+        if (event.getGoogleEventId() != null) {
+            googleCalendarAdapter.deleteMeetingFromGoogle(
+                event.getUserId(), 
+                event.getGoogleEventId()
+            );
+        }
+    }
+    @Async
+    @TransactionalEventListener
+    public void handleMeetingUpdate(MeetingUpdatedEvent event) {
+        log.info("EVENT RECEIVED: Cập nhật cuộc họp ID {}, Google ID: {}", event.getMeetingId(), event.getGoogleEventId());
+        
+        try {
+            // Lấy dữ liệu mới nhất từ DB
+            Meeting meeting = meetingRepository.findById(event.getMeetingId())
+                    .orElseThrow(() -> new EntityNotFoundException("Meeting not found"));
+
+            // Gọi Adapter để update lên Google
+            googleCalendarAdapter.updateMeetingOnGoogle(
+                event.getUserId(), 
+                event.getGoogleEventId(), 
+                meeting
+            );
+            
+            // (Tùy chọn) Nếu muốn gửi email thông báo cập nhật lại cho khách mời, 
+            // bạn có thể gọi hàm sendEmails(meeting) tại đây.
+
+        } catch (Exception e) {
+            log.error("Lỗi khi xử lý event update meeting: ", e);
         }
     }
 
