@@ -20,9 +20,10 @@ import com.cmc.meeting.domain.port.repository.DeviceRepository;
 import com.cmc.meeting.domain.port.repository.MeetingRepository;
 import com.cmc.meeting.domain.port.repository.RoomRepository;
 import com.cmc.meeting.domain.port.repository.UserRepository;
-
+import com.cmc.meeting.domain.event.MeetingCancelledEvent;
 // Imports cho Domain (Lõi nghiệp vụ)
 import com.cmc.meeting.domain.event.MeetingCreatedEvent;
+import com.cmc.meeting.domain.event.MeetingUpdatedEvent;
 import com.cmc.meeting.domain.exception.MeetingConflictException;
 import com.cmc.meeting.domain.exception.PolicyViolationException;
 import com.cmc.meeting.domain.model.*; // Import tất cả (Meeting, User, Room, Role, Device, Status...)
@@ -183,6 +184,12 @@ public class MeetingServiceImpl implements MeetingService {
         meeting.cancelMeeting(request.getReason());
         Meeting savedMeeting = meetingRepository.save(meeting);
 
+        eventPublisher.publishEvent(new MeetingCancelledEvent(
+            meeting.getId(), 
+            meeting.getOrganizer().getId(), 
+            meeting.getGoogleEventId()
+        ));
+
         // BỔ SUNG: TẠO THÔNG BÁO IN-APP
         String message = String.format(
                 "Cuộc họp '%s' (lúc %s) đã bị hủy.",
@@ -295,6 +302,15 @@ public class MeetingServiceImpl implements MeetingService {
             meeting.getParticipants().stream()
                     .filter(p -> !p.getUser().getId().equals(currentUserId)) // Trừ người sửa
                     .forEach(p -> notificationService.createNotification(p.getUser(), updateMsg, updatedMeeting));
+        }
+        if (updatedMeeting.getStatus() == BookingStatus.CONFIRMED 
+                && updatedMeeting.getGoogleEventId() != null) {
+            
+            eventPublisher.publishEvent(new MeetingUpdatedEvent(
+                updatedMeeting.getId(),
+                updatedMeeting.getOrganizer().getId(),
+                updatedMeeting.getGoogleEventId()
+            ));
         }
 
         return convertMeetingToDTO(updatedMeeting);
@@ -451,6 +467,11 @@ public class MeetingServiceImpl implements MeetingService {
                 log.info("-> Đang hủy Meeting ID: {}", meeting.getId());
                 meeting.cancelMeeting(request.getReason());
                 meetingRepository.save(meeting);
+                eventPublisher.publishEvent(new MeetingCancelledEvent(
+                    meeting.getId(), 
+                    meeting.getOrganizer().getId(), 
+                    meeting.getGoogleEventId()
+                ));
             }
         }
     }
@@ -747,6 +768,13 @@ public class MeetingServiceImpl implements MeetingService {
                 log.info("-> (Update) Hủy Meeting ID: {}", meeting.getId());
                 meeting.cancelMeeting(reason);
                 meetingRepository.save(meeting);
+                if (meeting.getGoogleEventId() != null) {
+                    eventPublisher.publishEvent(new MeetingCancelledEvent(
+                        meeting.getId(), 
+                        meeting.getOrganizer().getId(), 
+                        meeting.getGoogleEventId()
+                    ));
+                }
             }
         }
 
