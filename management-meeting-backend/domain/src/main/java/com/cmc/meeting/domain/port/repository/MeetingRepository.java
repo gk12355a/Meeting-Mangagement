@@ -62,4 +62,5 @@ public interface MeetingRepository {
 
     Optional<Meeting> findCurrentMeetingAtRoom(Long roomId, LocalDateTime checkTime);
     Optional<Meeting> findByCheckinCode(String checkinCode);
+    List<Meeting> findByOrganizerIdAndStartTime(Long organizerId, LocalDateTime startTime);
 }

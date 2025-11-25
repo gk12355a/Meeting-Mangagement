@@ -55,4 +55,10 @@ public class RoomRepositoryAdapter implements RoomRepository {
                 .map(entity -> modelMapper.map(entity, Room.class)) // Dùng ModelMapper
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public Optional<Room> findByNameContainingIgnoreCase(String name) {
+        return jpaRepository.findByNameContainingIgnoreCase(name)
+                .map(entity -> modelMapper.map(entity, Room.class));
+    }
 }

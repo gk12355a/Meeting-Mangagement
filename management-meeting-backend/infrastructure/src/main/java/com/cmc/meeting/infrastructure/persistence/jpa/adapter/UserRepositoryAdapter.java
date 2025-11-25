@@ -93,4 +93,11 @@ public class UserRepositoryAdapter implements UserRepository {
                 .collect(Collectors.toList());
     }
     
+
+    @Override
+    public List<User> findByFullNameContainingIgnoreCase(String fullName) {
+        return jpaRepository.findByFullNameContainingIgnoreCase(fullName).stream()
+                .map(entity -> modelMapper.map(entity, User.class)) // Map Entity -> Domain
+                .collect(Collectors.toList());
+    }
 }

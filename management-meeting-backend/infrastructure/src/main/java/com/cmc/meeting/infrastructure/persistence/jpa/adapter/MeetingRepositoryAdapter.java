@@ -290,4 +290,14 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
         return jpaRepository.findByCheckinCode(checkinCode)
                 .map(this::toDomain); // Dùng toDomain thay vì ModelMapper thuần
     }
+
+    @Override
+    public List<Meeting> findByOrganizerIdAndStartTime(Long organizerId, LocalDateTime startTime) {
+        // Gọi xuống JPA
+        List<MeetingEntity> entities = jpaRepository.findByOrganizerIdAndStartTime(organizerId, startTime);
+        // Map từ Entity sang Domain Model
+        return entities.stream()
+                .map(this::toDomain)
+                .collect(Collectors.toList());
+    }
 }

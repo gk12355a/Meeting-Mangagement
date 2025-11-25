@@ -181,4 +181,5 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
         Optional<MeetingEntity> findActiveMeetingInRoom(@Param("roomId") Long roomId,
                         @Param("checkTime") LocalDateTime checkTime);
         Optional<MeetingEntity> findByCheckinCode(String checkinCode);
+        List<MeetingEntity> findByOrganizerIdAndStartTime(Long organizerId, LocalDateTime startTime);
 }

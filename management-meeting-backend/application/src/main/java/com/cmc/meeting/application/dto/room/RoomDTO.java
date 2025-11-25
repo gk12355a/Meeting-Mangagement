@@ -4,9 +4,13 @@ import lombok.Data;
 import java.util.List;
 import com.cmc.meeting.domain.model.Role; // Bổ sung
 import com.cmc.meeting.domain.model.RoomStatus;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 
 import java.util.Set; // Bổ sung
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class RoomDTO {
     private Long id;
     private String name;

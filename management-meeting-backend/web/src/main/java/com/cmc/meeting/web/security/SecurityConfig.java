@@ -105,7 +105,6 @@ public class SecurityConfig {
         http.authenticationProvider(authenticationProvider());
         http.addFilterBefore(jwtAuthenticationFilter, 
                              UsernamePasswordAuthenticationFilter.class);
-        
         return http.build();
     }
 }
