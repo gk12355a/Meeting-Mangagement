@@ -7,7 +7,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-
+import com.cmc.meeting.application.port.service.MeetingService; // <-- IMPORT MỚI
+import com.cmc.meeting.application.dto.response.BookedSlotDTO; // <-- IMPORT MỚI
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,9 +25,11 @@ import java.util.List;
 public class RoomController {
 
     private final RoomService roomService;
+    private final MeetingService meetingService;
 
-    public RoomController(RoomService roomService) {
+    public RoomController(RoomService roomService, MeetingService meetingService) {
         this.roomService = roomService;
+        this.meetingService = meetingService;
     }
 
     /**
@@ -91,5 +94,17 @@ public class RoomController {
 
         List<RoomDTO> rooms = roomService.findAvailableRooms(startTime, endTime, capacity);
         return ResponseEntity.ok(rooms);
+    }
+
+    @GetMapping("/{id}/meetings")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<List<BookedSlotDTO>> getRoomSchedule(
+            @PathVariable Long id,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
+        
+        // Dòng này sẽ hết lỗi vì 'meetingService' đã được tiêm (inject)
+        List<BookedSlotDTO> schedule = meetingService.getRoomSchedule(id, startTime, endTime);
+        return ResponseEntity.ok(schedule);
     }
 }

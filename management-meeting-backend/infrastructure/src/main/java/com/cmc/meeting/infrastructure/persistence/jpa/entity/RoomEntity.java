@@ -31,4 +31,7 @@ public class RoomEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private RoomStatus status = RoomStatus.AVAILABLE;
+
+    @Column(name = "requires_approval", nullable = false)
+    private boolean requiresApproval = false;
 }

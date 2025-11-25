@@ -17,12 +17,14 @@ public class MeetingDTO {
     private LocalDateTime startTime;
     private LocalDateTime endTime;
     private BookingStatus status;
+    private String seriesId;
 
     // Trả về thông tin chi tiết (chúng ta sẽ tạo UserDTO và RoomDTO sau)
     private RoomDTO room;
     private UserDTO creator;
     private UserDTO organizer;
     private List<MeetingParticipantDTO> participants;
+    private String checkinCode;
 
     // ----- Các DTO lồng nhau (Nested DTOs) -----
     // (Để đơn giản, chúng ta định nghĩa tạm ở đây)

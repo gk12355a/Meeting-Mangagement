@@ -28,6 +28,7 @@ public class Meeting {
     private String cancelReason;
     private LocalDateTime cancelledAt;
     private User creator; // Người tạo (vd: Thư ký, người nhấn nút)
+    private String checkinCode;
     // BỔ SUNG: (US-12)
     private Set<Device> devices = new HashSet<>();
     private Set<String> guestEmails = new HashSet<>();
@@ -105,5 +106,16 @@ public class Meeting {
         }
 
         participant.setStatus(newStatus);
+    }
+    public void autoCancelGhostMeeting(String reason) {
+        // Hàm này KHÔNG check thời gian, vì Ghost Meeting bản chất là quá khứ
+        if (this.status != BookingStatus.CONFIRMED) {
+            // Chỉ hủy nếu nó đang confirm (tránh hủy trùng)
+            return; 
+        }
+        
+        this.status = BookingStatus.CANCELLED;
+        this.cancelReason = reason;
+        this.cancelledAt = LocalDateTime.now();
     }
 }

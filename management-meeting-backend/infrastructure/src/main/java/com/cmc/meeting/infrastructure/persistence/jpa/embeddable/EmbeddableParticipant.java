@@ -1,5 +1,7 @@
 package com.cmc.meeting.infrastructure.persistence.jpa.embeddable;
 
+import java.time.LocalDateTime;
+
 import com.cmc.meeting.domain.model.ParticipantStatus;
 
 import jakarta.persistence.Column;
@@ -19,4 +21,7 @@ public class EmbeddableParticipant {
 
     @Column(unique = true) // Đảm bảo token là duy nhất
     private String responseToken;
+
+    @Column(name = "checked_in_at")
+    private LocalDateTime checkedInAt;
 }

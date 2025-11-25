@@ -1,10 +1,11 @@
 package com.cmc.meeting.application.port.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-
+import com.cmc.meeting.application.dto.response.BookedSlotDTO;
 import com.cmc.meeting.application.dto.meeting.CheckInRequest;
 import com.cmc.meeting.application.dto.meeting.MeetingCancelRequest;
 import com.cmc.meeting.application.dto.meeting.MeetingResponseRequest;
@@ -35,4 +36,9 @@ public interface MeetingService {
     // CẬP NHẬT: (US-6) Thêm Pageable
     Page<MeetingDTO> getMyMeetings(Long currentUserId, Pageable pageable);
     Page<MeetingDTO> getAllMeetings(Pageable pageable);
+    List<BookedSlotDTO> getRoomSchedule(Long roomId, LocalDateTime startTime, LocalDateTime endTime);
+    List<BookedSlotDTO> getDeviceSchedule(Long deviceId, LocalDateTime startTime, LocalDateTime endTime);
+    void processMeetingApproval(Long meetingId, boolean isApproved, String reason, Long currentAdminId);
+    void checkInByQrCode(String qrCode, Long currentUserId);
+    String generateGoogleCalendarLink(Long meetingId);
 }

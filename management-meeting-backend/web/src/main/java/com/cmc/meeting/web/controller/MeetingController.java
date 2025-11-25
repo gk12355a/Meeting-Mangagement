@@ -7,10 +7,14 @@ import com.cmc.meeting.application.dto.request.MeetingCreationRequest;
 import com.cmc.meeting.application.dto.request.MeetingUpdateRequest;
 import com.cmc.meeting.application.dto.response.MeetingDTO;
 import com.cmc.meeting.application.port.service.MeetingService;
+import com.cmc.meeting.domain.model.Meeting;
 import com.cmc.meeting.domain.model.ParticipantStatus;
 import com.cmc.meeting.domain.model.User;
+import com.cmc.meeting.domain.port.repository.MeetingRepository;
 // BỔ SUNG: Import 2 thư viện này
 import com.cmc.meeting.domain.port.repository.UserRepository;
+import com.cmc.meeting.infrastructure.persistence.jpa.adapter.GoogleCalendarAdapter;
+
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
@@ -18,6 +22,7 @@ import org.springframework.data.domain.Sort;
 // -------------------------
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 
 import org.springframework.data.domain.Page;
@@ -29,7 +34,10 @@ import org.springframework.web.bind.annotation.*;
 import com.cmc.meeting.application.dto.timeslot.TimeSlotDTO; // Bổ sung
 import com.cmc.meeting.application.dto.timeslot.TimeSuggestionRequest; // Bổ sung
 import com.cmc.meeting.application.port.service.TimeSuggestionService; // Bổ sung
+
+import java.util.Collections;
 import java.util.List; // Bổ sung
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/meetings")
@@ -40,13 +48,21 @@ public class MeetingController {
         // BỔ SUNG: Chúng ta cần UserRepository để lấy User domain
         private final UserRepository userRepository;
         private final TimeSuggestionService timeSuggestionService;
+        private final MeetingRepository meetingRepository;
+        private final GoogleCalendarAdapter googleCalendarAdapter;
 
         // CẬP NHẬT CONSTRUCTOR
-        public MeetingController(MeetingService meetingService, UserRepository userRepository,
-                        TimeSuggestionService timeSuggestionService) {
+        public MeetingController(MeetingService meetingService,
+                        UserRepository userRepository,
+                        TimeSuggestionService timeSuggestionService,
+                        MeetingRepository meetingRepository, // <-- Thêm
+                        GoogleCalendarAdapter googleCalendarAdapter // <-- Thêm
+        ) {
                 this.meetingService = meetingService;
                 this.userRepository = userRepository;
                 this.timeSuggestionService = timeSuggestionService;
+                this.meetingRepository = meetingRepository; // <-- Gán
+                this.googleCalendarAdapter = googleCalendarAdapter; // <-- Gán
         }
 
         @PostMapping
@@ -269,4 +285,62 @@ public class MeetingController {
                 return ResponseEntity.ok(firstMeeting);
         }
 
+        @PostMapping("/check-in/qr")
+        @Operation(summary = "Check-in tham dự cuộc họp bằng mã QR")
+        public ResponseEntity<String> checkInByQr(
+                        @RequestBody Map<String, String> payload,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                String qrCode = payload.get("qrCode");
+                if (qrCode == null || qrCode.isBlank()) {
+                        return ResponseEntity.badRequest().body("Mã QR không được để trống.");
+                }
+
+                // Lấy ID người đang quét mã
+                Long userId = getUserId(userDetails); // Sử dụng hàm helper getUserId có sẵn trong controller
+
+                // Gọi Service xử lý
+                meetingService.checkInByQrCode(qrCode, userId);
+
+                return ResponseEntity.ok("Check-in thành công! Chào mừng bạn vào họp.");
+        }
+
+        private Long getUserId(UserDetails userDetails) {
+                User user = userRepository.findByUsername(userDetails.getUsername())
+                                .orElseThrow(() -> new EntityNotFoundException("User không tồn tại (Token invalid)"));
+                return user.getId();
+        }
+
+        @GetMapping("/{id}/sync/google")
+        @Operation(summary = "Lấy link để thêm vào Google Calendar")
+        public ResponseEntity<Map<String, String>> getGoogleCalendarLink(@PathVariable Long id) {
+                String googleLink = meetingService.generateGoogleCalendarLink(id);
+
+                // Trả về JSON cho đẹp: { "url": "https://calendar.google.com..." }
+                return ResponseEntity.ok(Collections.singletonMap("url", googleLink));
+        }
+
+        @GetMapping("/{id}/test-sync-google")
+        @Operation(summary = "Test API: Gọi trực tiếp Google Sync để xem log lỗi ngay lập tức")
+        public ResponseEntity<?> testSyncGoogle(@PathVariable Long id,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+                try {
+                        // A. Lấy User thực từ Token
+                        User currentUser = userRepository.findByUsername(userDetails.getUsername())
+                                        .orElseThrow(() -> new RuntimeException("User not found"));
+
+                        // B. Lấy Meeting Gốc (Entity) từ DB (Không dùng DTO vì Adapter cần Entity)
+                        Meeting meeting = meetingRepository.findById(id)
+                                        .orElseThrow(() -> new EntityNotFoundException("Meeting not found: " + id));
+
+                        // C. Gọi trực tiếp Adapter (Bỏ qua Async để debug)
+                        googleCalendarAdapter.pushMeetingToGoogle(currentUser.getId(), meeting);
+
+                        return ResponseEntity.ok(
+                                        "Đã gọi hàm Sync xong. Vui lòng KIỂM TRA LOG SERVER (Console) ngay bây giờ để xem kết quả.");
+                } catch (Exception e) {
+                        // Nếu có lỗi hệ thống (ví dụ code sai) thì nó hiện ở đây
+                        return ResponseEntity.badRequest().body("Lỗi khi gọi hàm: " + e.getMessage());
+                }
+        }
 }

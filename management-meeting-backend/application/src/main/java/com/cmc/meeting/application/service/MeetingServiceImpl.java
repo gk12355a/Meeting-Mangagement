@@ -6,8 +6,10 @@ import com.cmc.meeting.application.dto.meeting.MeetingCancelRequest;
 import com.cmc.meeting.application.dto.meeting.MeetingResponseRequest;
 import com.cmc.meeting.application.dto.request.MeetingCreationRequest;
 import com.cmc.meeting.application.dto.request.MeetingUpdateRequest;
+import com.cmc.meeting.application.dto.response.BookedSlotDTO;
 import com.cmc.meeting.application.dto.response.MeetingDTO;
 import com.cmc.meeting.application.dto.response.MeetingParticipantDTO;
+import com.cmc.meeting.application.dto.recurrence.FrequencyType;
 import com.cmc.meeting.application.dto.recurrence.RecurrenceRuleDTO;
 import com.cmc.meeting.application.dto.timeslot.TimeSlotDTO;
 
@@ -34,9 +36,15 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -118,8 +126,9 @@ public class MeetingServiceImpl implements MeetingService {
         // --- 2. Xử lý Lịch định kỳ ---
         if (request.getRecurrenceRule() == null) {
             // --- A. HỌP 1 LẦN ---
-            checkAccessAndConflicts(room, organizer, participants, devices, request.getStartTime(),
-                    request.getEndTime());
+            checkAccessAndConflicts(room, organizer, participants, devices,
+                    request.getStartTime(), request.getEndTime(), null); // <-- SỬA Ở ĐÂY
+
             return createSingleMeeting(request, room, creator, organizer,
                     participants, devices, guestEmails, null);
 
@@ -133,7 +142,8 @@ public class MeetingServiceImpl implements MeetingService {
 
             // Kiểm tra xung đột cho TẤT CẢ các slot
             for (TimeSlotDTO slot : slots) {
-                checkAccessAndConflicts(room, organizer, participants, devices, slot.getStartTime(), slot.getEndTime());
+                checkAccessAndConflicts(room, organizer, participants, devices, slot.getStartTime(), slot.getEndTime(),
+                        null);
             }
 
             // Tạo hàng loạt
@@ -155,13 +165,19 @@ public class MeetingServiceImpl implements MeetingService {
      * (US-2) Hủy lịch họp
      */
     @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW) // <-- THÊM/SỬA DÒNG NÀY
     public void cancelMeeting(Long meetingId, MeetingCancelRequest request, Long currentUserId) {
         Meeting meeting = meetingRepository.findById(meetingId)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy cuộc họp với ID: " + meetingId));
 
-        // CHỈ người tổ chức mới được hủy
-        if (!meeting.getOrganizer().getId().equals(currentUserId)) {
-            throw new PolicyViolationException("Chỉ người tổ chức mới có quyền hủy cuộc họp này.");
+        // CHỈ người tổ chức mới được hủy (hoặc Admin)
+        // (Chúng ta nên thêm logic cho phép Admin)
+        boolean isAdmin = userRepository.findById(currentUserId)
+                .map(u -> u.getRoles().contains(Role.ROLE_ADMIN))
+                .orElse(false);
+
+        if (!meeting.getOrganizer().getId().equals(currentUserId) && !isAdmin) { // <-- Sửa logic
+            throw new PolicyViolationException("Chỉ người tổ chức hoặc Admin mới có quyền hủy cuộc họp này.");
         }
 
         meeting.cancelMeeting(request.getReason());
@@ -176,7 +192,8 @@ public class MeetingServiceImpl implements MeetingService {
         savedMeeting.getParticipants().stream()
                 .filter(p -> !p.getUser().getId().equals(currentUserId))
                 .forEach(p -> notificationService.createNotification(
-                        p.getUser(), message, savedMeeting));
+                        p.getUser(), message // Dùng hàm không có meetingId
+                ));
     }
 
     /**
@@ -203,6 +220,11 @@ public class MeetingServiceImpl implements MeetingService {
         Room newRoom = roomRepository.findById(request.getRoomId())
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy phòng họp"));
 
+        // --- LOGIC KIỂM TRA THAY ĐỔI ---
+        boolean isRoomChanged = !meeting.getRoom().getId().equals(newRoom.getId());
+        boolean isTimeChanged = !meeting.getStartTime().equals(request.getStartTime()) ||
+                !meeting.getEndTime().equals(request.getEndTime());
+
         Set<User> newParticipantUsers = request.getParticipantIds().stream()
                 .map(id -> userRepository.findById(id)
                         .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy người tham dự với ID: " + id)))
@@ -215,8 +237,10 @@ public class MeetingServiceImpl implements MeetingService {
         Set<String> newGuestEmails = (request.getGuestEmails() != null) ? request.getGuestEmails() : new HashSet<>();
 
         // Kiểm tra quyền và xung đột cho phòng/thời gian MỚI
-        checkAccessAndConflicts(newRoom, meeting.getOrganizer(), newParticipantUsers, newDevices, request.getStartTime(),
-                request.getEndTime());
+        // (Truyền meetingId để bỏ qua chính nó khi check trùng)
+        checkAccessAndConflicts(newRoom, meeting.getOrganizer(), newParticipantUsers, newDevices,
+                request.getStartTime(), request.getEndTime(),
+                meetingId);
 
         // Chuyển đổi sang Set<MeetingParticipant>
         Set<MeetingParticipant> newParticipants = new HashSet<>();
@@ -229,7 +253,7 @@ public class MeetingServiceImpl implements MeetingService {
             }
         });
 
-        // Cập nhật các trường
+        // --- CẬP NHẬT THÔNG TIN CƠ BẢN ---
         meeting.setTitle(request.getTitle());
         meeting.setDescription(request.getDescription());
         meeting.setStartTime(request.getStartTime());
@@ -239,8 +263,52 @@ public class MeetingServiceImpl implements MeetingService {
         meeting.setDevices(newDevices);
         meeting.setGuestEmails(newGuestEmails);
 
+        // --- SỬA LỖI: LOGIC RESET TRẠNG THÁI DUYỆT ---
+        if (newRoom.isRequiresApproval()) {
+            // Nếu phòng là VIP
+            if (isRoomChanged || isTimeChanged) {
+                // Nếu đổi phòng hoặc đổi giờ -> Phải duyệt lại
+                meeting.setStatus(BookingStatus.PENDING_APPROVAL);
+
+                // Gửi thông báo cho Admin
+                notifyAdminsForApproval(meeting, organizer);
+
+                // Thông báo cho người sửa
+                notificationService.createNotification(organizer,
+                        "Do thay đổi phòng/giờ sang khu vực cần duyệt, lịch họp của bạn đã chuyển sang trạng thái CHỜ DUYỆT.",
+                        meeting);
+            }
+            // Nếu chỉ đổi tên/mô tả/người tham gia -> Giữ nguyên trạng thái cũ (không cần
+            // duyệt lại)
+        } else {
+            // Nếu phòng mới là phòng Thường -> Auto Confirm
+            meeting.setStatus(BookingStatus.CONFIRMED);
+        }
+
         Meeting updatedMeeting = meetingRepository.save(meeting);
+
+        // Nếu sau khi update mà là CONFIRMED (tức là chuyển từ VIP -> Thường, hoặc sửa
+        // nhẹ phòng thường)
+        // Thì gửi thông báo cập nhật cho người tham gia
+        if (updatedMeeting.getStatus() == BookingStatus.CONFIRMED) {
+            String updateMsg = "Thông tin cuộc họp '" + updatedMeeting.getTitle() + "' đã được cập nhật.";
+            meeting.getParticipants().stream()
+                    .filter(p -> !p.getUser().getId().equals(currentUserId)) // Trừ người sửa
+                    .forEach(p -> notificationService.createNotification(p.getUser(), updateMsg, updatedMeeting));
+        }
+
         return convertMeetingToDTO(updatedMeeting);
+    }
+
+    private void notifyAdminsForApproval(Meeting meeting, User organizer) {
+        List<User> admins = userRepository.findAllAdmins();
+        String msgToAdmin = String.format(
+                "CẬP NHẬT: Yêu cầu duyệt lại. %s đã thay đổi lịch họp tại phòng '%s'.",
+                organizer.getFullName(),
+                meeting.getRoom().getName());
+        for (User admin : admins) {
+            notificationService.createNotification(admin, msgToAdmin, meeting);
+        }
     }
 
     /**
@@ -293,23 +361,21 @@ public class MeetingServiceImpl implements MeetingService {
 
         meeting.respondToInvitation(currentUser, request.getStatus());
         Meeting savedMeeting = meetingRepository.save(meeting);
-        
+
         // BỔ SUNG: TẠO THÔNG BÁO IN-APP
         // Gửi thông báo cho Người tổ chức (organizer)
         String message = String.format(
-            "%s đã %s lời mời tham gia cuộc họp '%s'.",
-            currentUser.getFullName(),
-            request.getStatus() == ParticipantStatus.ACCEPTED ? "chấp nhận" : "từ chối",
-            savedMeeting.getTitle()
-        );
-        
+                "%s đã %s lời mời tham gia cuộc họp '%s'.",
+                currentUser.getFullName(),
+                request.getStatus() == ParticipantStatus.ACCEPTED ? "chấp nhận" : "từ chối",
+                savedMeeting.getTitle());
+
         // ==========================================================
         // SỬA LỖI: Gọi hàm KHÔNG có 'savedMeeting'
         // (Để tránh gửi meetingId cho thông báo Phản hồi)
         // ==========================================================
         notificationService.createNotification(
-            savedMeeting.getOrganizer(), message
-        );
+                savedMeeting.getOrganizer(), message);
     }
 
     /**
@@ -398,6 +464,16 @@ public class MeetingServiceImpl implements MeetingService {
             User creator, User organizer,
             Set<User> participants, Set<Device> devices, Set<String> guestEmails, String seriesId) {
 
+        // === LOGIC MỚI: XÁC ĐỊNH TRẠNG THÁI ===
+        BookingStatus initialStatus;
+        if (room.isRequiresApproval()) {
+            // Nếu phòng cần duyệt -> Trạng thái CHỜ DUYỆT
+            initialStatus = BookingStatus.PENDING_APPROVAL;
+        } else {
+            // Nếu phòng bình thường -> XÁC NHẬN luôn
+            initialStatus = BookingStatus.CONFIRMED;
+        }
+
         Meeting newMeeting = new Meeting(
                 request.getTitle(),
                 request.getStartTime(),
@@ -409,27 +485,110 @@ public class MeetingServiceImpl implements MeetingService {
                 devices,
                 guestEmails,
                 seriesId);
+        newMeeting.setCheckinCode(UUID.randomUUID().toString());
+
+        // Set trạng thái vừa tính toán
+        newMeeting.setStatus(initialStatus);
 
         Meeting savedMeeting = meetingRepository.save(newMeeting);
-        eventPublisher.publishEvent(new MeetingCreatedEvent(savedMeeting.getId()));
 
-        // BỔ SUNG: TẠO THÔNG BÁO IN-APP
-        String message = String.format(
-                "%s đã mời bạn tham gia cuộc họp: %s",
-                creator.getFullName(),
-                savedMeeting.getTitle());
-        savedMeeting.getParticipants().stream()
+        // === LOGIC THÔNG BÁO (ĐÃ SỬA) ===
+        if (initialStatus == BookingStatus.CONFIRMED) {
+            // A. Nếu được xác nhận ngay
+            eventPublisher.publishEvent(new MeetingCreatedEvent(savedMeeting.getId()));
+
+            String message = String.format(
+                    "%s đã mời bạn tham gia cuộc họp: %s",
+                    creator.getFullName(),
+                    savedMeeting.getTitle());
+            sendNotificationsToParticipants(savedMeeting, message);
+        } else {
+            // B. Nếu chờ duyệt (PENDING_APPROVAL)
+
+            // 1. Báo cho người tổ chức
+            String msgToOrganizer = String.format(
+                    "Yêu cầu đặt phòng '%s' của bạn đang chờ Admin phê duyệt.",
+                    room.getName());
+            notificationService.createNotification(organizer, msgToOrganizer, savedMeeting);
+
+            // 2. [ĐÃ HOÀN THIỆN] Gửi thông báo cho TẤT CẢ Admin
+            List<User> admins = userRepository.findAllAdmins();
+
+            String msgToAdmin = String.format(
+                    "Yêu cầu duyệt phòng mới: %s muốn đặt phòng '%s' vào lúc %s.",
+                    organizer.getFullName(),
+                    room.getName(),
+                    savedMeeting.getStartTime().toString().replace("T", " ") // Format nhẹ
+            );
+
+            for (User admin : admins) {
+                // Gửi thông báo kèm link meeting để Admin bấm vào xem chi tiết và duyệt
+                notificationService.createNotification(admin, msgToAdmin, savedMeeting);
+            }
+        }
+
+        return convertMeetingToDTO(savedMeeting);
+    }
+
+    // 2. Implement hàm API Duyệt (Thêm vào interface MeetingService trước)
+    @Override
+    public void processMeetingApproval(Long meetingId, boolean isApproved, String reason, Long currentAdminId) {
+        Meeting meeting = meetingRepository.findById(meetingId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy cuộc họp với ID: " + meetingId));
+
+        // Chỉ xử lý nếu đang chờ duyệt
+        if (meeting.getStatus() != BookingStatus.PENDING_APPROVAL) {
+            throw new PolicyViolationException(
+                    "Cuộc họp này không ở trạng thái chờ duyệt (Status hiện tại: " + meeting.getStatus() + ")");
+        }
+
+        if (isApproved) {
+            // === TRƯỜNG HỢP 1: ADMIN ĐỒNG Ý ===
+            meeting.setStatus(BookingStatus.CONFIRMED);
+            meetingRepository.save(meeting);
+
+            // 1. Gửi Event (để gửi email mời họp)
+            eventPublisher.publishEvent(new MeetingCreatedEvent(meeting.getId()));
+
+            // 2. Thông báo cho Người tổ chức
+            notificationService.createNotification(meeting.getOrganizer(),
+                    "Phòng họp '" + meeting.getRoom().getName() + "' đã được phê duyệt!", meeting);
+
+            // 3. Thông báo cho Người tham gia (bây giờ mới gửi)
+            String inviteMsg = String.format("%s đã mời bạn tham gia cuộc họp: %s",
+                    meeting.getOrganizer().getFullName(), meeting.getTitle());
+            sendNotificationsToParticipants(meeting, inviteMsg);
+
+        } else {
+            // === TRƯỜNG HỢP 2: ADMIN TỪ CHỐI ===
+            meeting.setStatus(BookingStatus.REJECTED);
+            // (Nếu muốn lưu lý do từ chối vào DB, bạn cần thêm trường 'rejectionReason' vào
+            // Entity Meeting)
+            meetingRepository.save(meeting);
+
+            // Gửi thông báo từ chối cho Người tổ chức
+            String rejectMsg = String.format("Yêu cầu đặt phòng '%s' bị từ chối. Lý do: %s",
+                    meeting.getRoom().getName(), reason);
+
+            // Dùng hàm createNotification đơn giản (không kèm link meeting để tránh bấm
+            // vào)
+            notificationService.createNotification(meeting.getOrganizer(), rejectMsg);
+        }
+    }
+
+    // Helper tách ra để tái sử dụng
+    private void sendNotificationsToParticipants(Meeting meeting, String message) {
+        meeting.getParticipants().stream()
                 .filter(p -> p.getStatus() == ParticipantStatus.PENDING)
                 .forEach(p -> notificationService.createNotification(
-                        p.getUser(), message, savedMeeting));
-        return convertMeetingToDTO(savedMeeting);
+                        p.getUser(), message, meeting));
     }
 
     /**
      * HELPER 2: Logic kiểm tra Xung đột VÀ Quyền (US-21)
      */
     private void checkAccessAndConflicts(Room room, User organizer, Set<User> participants, Set<Device> devices,
-            LocalDateTime startTime, LocalDateTime endTime) {
+            LocalDateTime startTime, LocalDateTime endTime, Long meetingIdToIgnore) {
 
         if (room.getStatus() == RoomStatus.UNDER_MAINTENANCE) {
             throw new PolicyViolationException(
@@ -449,7 +608,7 @@ public class MeetingServiceImpl implements MeetingService {
         }
 
         // 2. KIỂM TRA XUNG ĐỘT (Phòng)
-        if (meetingRepository.isRoomBusy(room.getId(), startTime, endTime)) {
+        if (meetingRepository.isRoomBusy(room.getId(), startTime, endTime, meetingIdToIgnore)) {
             throw new MeetingConflictException(
                     String.format("Phòng '%s' đã bị đặt vào lúc %s", room.getName(), startTime));
         }
@@ -461,7 +620,7 @@ public class MeetingServiceImpl implements MeetingService {
         userIdsToCheck.add(organizer.getId()); // Thêm cả organizer vào danh sách check
 
         List<Meeting> conflictingUserMeetings = meetingRepository
-                .findConflictingMeetingsForUsers(userIdsToCheck, startTime, endTime);
+                .findConflictingMeetingsForUsers(userIdsToCheck, startTime, endTime, meetingIdToIgnore);
 
         if (!conflictingUserMeetings.isEmpty()) {
             // Tìm xem ai là người bị trùng
@@ -473,9 +632,9 @@ public class MeetingServiceImpl implements MeetingService {
                     String.format("Người tham dự (%s) bị trùng lịch vào lúc %s", conflictingUser, startTime));
         }
         Set<Long> deviceIds = devices.stream().map(Device::getId).collect(Collectors.toSet());
-        if (meetingRepository.isDeviceBusy(deviceIds, startTime, endTime)) {
+        if (meetingRepository.isDeviceBusy(deviceIds, startTime, endTime, meetingIdToIgnore)) {
             throw new MeetingConflictException(
-                    String.format("Một trong các thiết bị bạn chọn đã bị đặt vào lúc %s", startTime));
+                    String.format("Một hoặc nhiều thiết bị bạn chọn đã bị đặt vào lúc %s", startTime));
         }
     }
 
@@ -488,7 +647,56 @@ public class MeetingServiceImpl implements MeetingService {
         List<TimeSlotDTO> slots = new ArrayList<>();
         long durationMinutes = java.time.Duration.between(firstStartTime, firstEndTime).toMinutes();
 
+        // --- TRƯỜNG HỢP 1: LẶP THEO THỨ (WEEKLY + daysOfWeek) ---
+        if (rule.getFrequency() == FrequencyType.WEEKLY
+                && rule.getDaysOfWeek() != null
+                && !rule.getDaysOfWeek().isEmpty()) {
+
+            LocalDate currentDate = firstStartTime.toLocalDate();
+            LocalDate endDate = rule.getRepeatUntil();
+
+            // Duyệt từng ngày từ ngày bắt đầu đến ngày kết thúc
+            while (!currentDate.isAfter(endDate)) {
+
+                // 1. Nếu ngày hiện tại khớp với một trong các thứ đã chọn
+                if (rule.getDaysOfWeek().contains(currentDate.getDayOfWeek())) {
+
+                    // Tạo thời gian bắt đầu và kết thúc cho slot này
+                    LocalDateTime slotStart = currentDate.atTime(firstStartTime.toLocalTime());
+                    LocalDateTime slotEnd = slotStart.plusMinutes(durationMinutes);
+
+                    // (Quan trọng) Chỉ thêm nếu slot này không nằm trước thời gian gốc
+                    // (để tránh lỗi logic nếu ngày bắt đầu không rơi vào thứ được chọn)
+                    if (!slotStart.isBefore(firstStartTime)) {
+                        slots.add(new TimeSlotDTO(slotStart, slotEnd));
+                    }
+                }
+
+                // 2. Xử lý nhảy tuần (Interval)
+                // Nếu hôm nay là CHỦ NHẬT, ta cần kiểm tra xem có cần nhảy cóc tuần không
+                if (currentDate.getDayOfWeek() == java.time.DayOfWeek.SUNDAY) {
+                    // Nếu interval > 1 (ví dụ 2 tuần 1 lần), ta cần cộng thêm số tuần nghỉ
+                    // Interval 1: Cộng 0 tuần (tuần sau họp tiếp)
+                    // Interval 2: Cộng 1 tuần (nghỉ 1 tuần)
+                    int weeksToSkip = rule.getInterval() - 1;
+                    if (weeksToSkip > 0) {
+                        currentDate = currentDate.plusWeeks(weeksToSkip);
+                    }
+                }
+
+                // Tăng 1 ngày để xét ngày tiếp theo
+                currentDate = currentDate.plusDays(1);
+            }
+
+            return slots;
+        }
+
+        // --- TRƯỜNG HỢP 2: LẶP CƠ BẢN (DAILY, MONTHLY, hoặc WEEKLY không chọn thứ) ---
+        // Logic cũ giữ nguyên cho các trường hợp đơn giản
         LocalDateTime currentStartTime = firstStartTime;
+
+        // Nếu Weekly mà không chọn thứ, mặc định là lặp lại đúng thứ của ngày bắt đầu
+        // (Code cũ của bạn đã xử lý việc này bằng 'plusWeeks')
 
         while (!currentStartTime.toLocalDate().isAfter(rule.getRepeatUntil())) {
 
@@ -506,6 +714,9 @@ public class MeetingServiceImpl implements MeetingService {
                 case MONTHLY:
                     currentStartTime = currentStartTime.plusMonths(rule.getInterval());
                     break;
+                default:
+                    // Tránh vòng lặp vô tận nếu frequency null
+                    currentStartTime = currentStartTime.plusDays(1);
             }
         }
         return slots;
@@ -609,4 +820,146 @@ public class MeetingServiceImpl implements MeetingService {
         return dto;
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<BookedSlotDTO> getRoomSchedule(Long roomId, LocalDateTime startTime, LocalDateTime endTime) {
+
+        // Gọi hàm repository mới
+        List<Meeting> meetings = meetingRepository.findMeetingsByRoomAndTimeRange(
+                roomId, startTime, endTime);
+
+        // Map sang DTO đơn giản
+        return meetings.stream()
+                .map(meeting -> new BookedSlotDTO(
+                        meeting.getId(),
+                        meeting.getTitle(),
+                        meeting.getStartTime(),
+                        meeting.getEndTime(),
+                        meeting.getOrganizer().getFullName()))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<BookedSlotDTO> getDeviceSchedule(Long deviceId, LocalDateTime startTime, LocalDateTime endTime) {
+
+        // Gọi hàm repository mới
+        List<Meeting> meetings = meetingRepository.findMeetingsByDeviceAndTimeRange(
+                deviceId, startTime, endTime);
+
+        // Map sang DTO đơn giản (Giống hệt getRoomSchedule)
+        return meetings.stream()
+                .map(meeting -> new BookedSlotDTO(
+                        meeting.getId(),
+                        meeting.getTitle(),
+                        meeting.getStartTime(),
+                        meeting.getEndTime(),
+                        meeting.getOrganizer().getFullName()))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public void checkInByQrCode(String qrCode, Long currentUserId) {
+        // 1. Tìm cuộc họp theo mã QR
+        Meeting meeting = meetingRepository.findByCheckinCode(qrCode)
+                .orElseThrow(() -> new EntityNotFoundException("Mã QR không hợp lệ hoặc cuộc họp không tồn tại."));
+
+        // --- DEBUG LOG (BẮT LỖI TẠI ĐÂY) ---
+        Long organizerId = meeting.getOrganizer().getId();
+        log.info(">>> DEBUG CHECK-IN: User đang quét = {}, Organizer của họp = {}", currentUserId, organizerId);
+        // -----------------------------------
+
+        // 2. KIỂM TRA THỜI GIAN
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime allowedStart = meeting.getStartTime().minusMinutes(30);
+        LocalDateTime allowedEnd = meeting.getEndTime();
+
+        if (now.isBefore(allowedStart)) {
+            throw new PolicyViolationException("Chưa đến giờ điểm danh (Cổng check-in mở trước giờ họp 30 phút).");
+        }
+        if (now.isAfter(allowedEnd)) {
+            throw new PolicyViolationException("Cuộc họp đã kết thúc, không thể điểm danh nữa.");
+        }
+
+        // 3. KIỂM TRA NGƯỜI DÙNG & LẤY PARTICIPANT
+        MeetingParticipant participant = meeting.getParticipants().stream()
+                .filter(p -> p.getUser().getId().equals(currentUserId))
+                .findFirst()
+                .orElse(null);
+
+        if (participant == null) {
+            // So sánh ID an toàn hơn (dùng .longValue() để tránh lỗi so sánh Object)
+            if (organizerId.longValue() == currentUserId.longValue()) {
+
+                log.info(">>> Organizer ID {} check-in. Tự động thêm vào danh sách.", currentUserId);
+
+                participant = new MeetingParticipant(meeting.getOrganizer(), ParticipantStatus.ACCEPTED, null);
+                participant.setMeeting(meeting);
+
+                meeting.getParticipants().add(participant);
+            } else {
+                // Nếu code chạy vào đây, hãy xem dòng LOG ở trên để biết tại sao ID không khớp!
+                throw new PolicyViolationException("Bạn không có tên trong danh sách tham dự cuộc họp này.");
+            }
+        }
+
+        // 4. THỰC HIỆN CHECK-IN
+        if (participant.getCheckedInAt() != null) {
+            throw new PolicyViolationException("Bạn đã check-in trước đó rồi (lúc " +
+                    participant.getCheckedInAt().toLocalTime() + ").");
+        }
+
+        participant.setCheckedInAt(now);
+        if (meeting.getOrganizer().getId().equals(currentUserId)) {
+            meeting.setCheckedIn(true); // Bật cờ is_checked_in trong bảng meetings
+            log.info("Organizer đã check-in -> Kích hoạt trạng thái cuộc họp.");
+        }
+        meetingRepository.save(meeting);
+
+        log.info("User ID {} đã check-in thành công vào Meeting ID {}", currentUserId, meeting.getId());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public String generateGoogleCalendarLink(Long meetingId) {
+        Meeting meeting = meetingRepository.findById(meetingId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy cuộc họp: " + meetingId));
+
+        // 1. Format thời gian sang chuẩn UTC của Google (yyyyMMddTHHmmssZ)
+        // Lưu ý: Cần chuyển đổi giờ hệ thống (Local) sang UTC
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
+                .withZone(ZoneId.of("UTC"));
+
+        String startUtc = formatter.format(meeting.getStartTime().atZone(ZoneId.systemDefault()).toInstant());
+        String endUtc = formatter.format(meeting.getEndTime().atZone(ZoneId.systemDefault()).toInstant());
+
+        // 2. Chuẩn bị dữ liệu và Encode URL (để xử lý dấu cách, tiếng Việt...)
+        String title = encodeValue(meeting.getTitle());
+        String details = encodeValue(meeting.getDescription() != null ? meeting.getDescription() : "");
+        String location = encodeValue(meeting.getRoom().getName());
+
+        // Thêm tên người tổ chức vào mô tả (nếu cần)
+        if (meeting.getOrganizer() != null) {
+            String orgInfo = "\n\nNgười tổ chức: " + meeting.getOrganizer().getFullName();
+            details += encodeValue(orgInfo);
+        }
+
+        // 3. Tạo URL theo format của Google
+        // Format:
+        // https://calendar.google.com/calendar/render?action=TEMPLATE&text=...&dates=...&details=...&location=...
+        return String.format(
+                "https://calendar.google.com/calendar/render?action=TEMPLATE&text=%s&dates=%s/%s&details=%s&location=%s",
+                title,
+                startUtc,
+                endUtc,
+                details,
+                location);
+    }
+
+    // Helper để Encode URL (ví dụ: dấu cách thành %20)
+    private String encodeValue(String value) {
+        if (value == null)
+            return "";
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
 }

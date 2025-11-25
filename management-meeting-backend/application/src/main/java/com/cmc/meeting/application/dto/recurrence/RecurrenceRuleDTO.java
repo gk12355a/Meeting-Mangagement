@@ -4,7 +4,10 @@ import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.util.Set;
 
 @Data
 public class RecurrenceRuleDTO {
@@ -18,4 +21,6 @@ public class RecurrenceRuleDTO {
     @NotNull
     @Future
     private LocalDate repeatUntil; // Lặp cho đến ngày
+
+    private Set<DayOfWeek> daysOfWeek;
 }
