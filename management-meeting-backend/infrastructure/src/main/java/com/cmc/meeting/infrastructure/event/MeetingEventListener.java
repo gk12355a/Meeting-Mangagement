@@ -1,7 +1,9 @@
 package com.cmc.meeting.infrastructure.event;
 
 import com.cmc.meeting.application.port.notification.EmailNotificationPort;
+import com.cmc.meeting.domain.event.MeetingCancelledEvent;
 import com.cmc.meeting.domain.event.MeetingCreatedEvent;
+import com.cmc.meeting.domain.event.MeetingUpdatedEvent;
 import com.cmc.meeting.domain.model.Meeting;
 import com.cmc.meeting.domain.model.MeetingParticipant;
 import com.cmc.meeting.domain.model.ParticipantStatus;
@@ -68,11 +70,54 @@ public class MeetingEventListener {
 
         // BƯỚC 3: ĐỒNG BỘ GOOGLE CALENDAR (Bọc trong try-catch riêng)
         try {
-            // Đồng bộ cho người tổ chức
-            googleCalendarAdapter.pushMeetingToGoogle(meeting.getOrganizer().getId(), meeting);
-            log.info("Đã gọi đồng bộ Google Calendar cho Organizer.");
+            // Gọi hàm push và NHẬN VỀ ID
+            String googleEventId = googleCalendarAdapter.pushMeetingToGoogle(
+                meeting.getOrganizer().getId(), 
+                meeting
+            );
+
+            // NẾU CÓ ID -> LƯU NGƯỢC VÀO DB
+            if (googleEventId != null) {
+                meeting.setGoogleEventId(googleEventId);
+                meetingRepository.save(meeting); 
+                log.info(">>> Đã lưu Google Event ID '{}' vào Database cho Meeting {}", googleEventId, meeting.getId());
+            }
+
         } catch (Exception e) {
             log.error("Lỗi khi đồng bộ Google Calendar: ", e);
+        }
+    }
+    @Async
+    @TransactionalEventListener
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void handleMeetingUpdate(MeetingUpdatedEvent event) {
+        log.info("EVENT: Cập nhật cuộc họp ID {}, Google ID: {}", event.getMeetingId(), event.getGoogleEventId());
+        try {
+            Meeting meeting = meetingRepository.findById(event.getMeetingId())
+                    .orElseThrow(() -> new EntityNotFoundException("Meeting not found"));
+
+            // Gọi Adapter Update
+            googleCalendarAdapter.updateMeetingOnGoogle(
+                event.getUserId(), 
+                event.getGoogleEventId(), 
+                meeting
+            );
+        } catch (Exception e) {
+            log.error("Lỗi handle update event: ", e);
+        }
+    }
+
+    @Async
+    @TransactionalEventListener
+    public void handleMeetingCancellation(MeetingCancelledEvent event) {
+        log.info("EVENT: Hủy cuộc họp ID {}, Google ID: {}", event.getMeetingId(), event.getGoogleEventId());
+        
+        // Gọi Adapter Delete
+        if (event.getGoogleEventId() != null) {
+            googleCalendarAdapter.deleteMeetingFromGoogle(
+                event.getUserId(), 
+                event.getGoogleEventId()
+            );
         }
     }
 
