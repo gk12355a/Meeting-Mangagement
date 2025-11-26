@@ -29,6 +29,7 @@ public class Meeting {
     private LocalDateTime cancelledAt;
     private User creator; // Người tạo (vd: Thư ký, người nhấn nút)
     private String checkinCode;
+    private String googleEventId;
     // BỔ SUNG: (US-12)
     private Set<Device> devices = new HashSet<>();
     private Set<String> guestEmails = new HashSet<>();
@@ -117,5 +118,13 @@ public class Meeting {
         this.status = BookingStatus.CANCELLED;
         this.cancelReason = reason;
         this.cancelledAt = LocalDateTime.now();
+    }
+
+    public String getGoogleEventId() {
+        return googleEventId;
+    }
+
+    public void setGoogleEventId(String googleEventId) {
+        this.googleEventId = googleEventId;
     }
 }

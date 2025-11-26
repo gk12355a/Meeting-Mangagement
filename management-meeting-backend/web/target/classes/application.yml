@@ -29,7 +29,7 @@ spring:
     hibernate:
       # BẬT LẠI: Đây chính là "Code First"
       ddl-auto: update 
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         format_sql: true
