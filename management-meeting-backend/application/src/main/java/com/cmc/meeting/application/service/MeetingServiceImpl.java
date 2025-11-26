@@ -89,6 +89,12 @@ public class MeetingServiceImpl implements MeetingService {
      */
     @Override
     public MeetingDTO createMeeting(MeetingCreationRequest request, Long currentUserId) {
+        if (request.getStartTime() != null) {
+            request.setStartTime(request.getStartTime().withSecond(0).withNano(0));
+        }
+        if (request.getEndTime() != null) {
+            request.setEndTime(request.getEndTime().withSecond(0).withNano(0));
+        }
         User creator = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy người tạo (creator)"));
 
@@ -189,6 +195,12 @@ public class MeetingServiceImpl implements MeetingService {
      */
     @Override
     public MeetingDTO updateMeeting(Long meetingId, MeetingUpdateRequest request, Long currentUserId) {
+        if (request.getStartTime() != null) {
+            request.setStartTime(request.getStartTime().withSecond(0).withNano(0));
+        }
+        if (request.getEndTime() != null) {
+            request.setEndTime(request.getEndTime().withSecond(0).withNano(0));
+        }
 
         Meeting meeting = meetingRepository.findById(meetingId)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy cuộc họp với ID: " + meetingId));
