@@ -9,6 +9,7 @@ import java.util.Set;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.repository.query.Param;
 
 // Đây là "Hợp đồng" (Contract)
 // Nó không biết gì về JPA hay MyBatiS
@@ -63,4 +64,5 @@ public interface MeetingRepository {
     Optional<Meeting> findCurrentMeetingAtRoom(Long roomId, LocalDateTime checkTime);
     Optional<Meeting> findByCheckinCode(String checkinCode);
     List<Meeting> findByOrganizerIdAndStartTime(Long organizerId, LocalDateTime startTime);
+    List<Meeting> findConflicts(Long roomId, LocalDateTime startTime, LocalDateTime endTime);
 }

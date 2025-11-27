@@ -300,4 +300,13 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
                 .map(this::toDomain)
                 .collect(Collectors.toList());
     }
+    @Override
+    public List<Meeting> findConflicts(Long roomId, LocalDateTime startTime, LocalDateTime endTime) {
+        // Gọi Spring Data
+        List<MeetingEntity> entities = jpaRepository.findConflicts(roomId, startTime, endTime);
+        // Map từ Entity (DB) sang Model (Domain)
+        return entities.stream()
+                .map(this::toDomain) // Hoặc logic map thủ công của bạn
+                .collect(Collectors.toList());
+    }
 }

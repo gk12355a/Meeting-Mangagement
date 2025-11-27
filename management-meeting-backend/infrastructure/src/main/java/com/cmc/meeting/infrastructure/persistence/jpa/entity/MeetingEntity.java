@@ -23,7 +23,7 @@ public class MeetingEntity {
     @Column(nullable = false)
     private String title;
 
-    @Lob // Dành cho text dài
+    @Lob // Dành cho text dài 
     private String description;
 
     @Column(nullable = false)

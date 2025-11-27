@@ -1,5 +1,6 @@
 package com.cmc.meeting.infrastructure.llm;
 
+import com.cmc.meeting.application.dto.chat.ChatMessage;
 import com.cmc.meeting.application.dto.chat.StructuredIntent;
 import com.cmc.meeting.application.port.llm.LanguageModelPort;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -25,10 +26,8 @@ public class GeminiRestAdapter implements LanguageModelPort {
     private final String apiKey;
     private final ObjectMapper objectMapper;
 
-    // Hardcode URL chuẩn của Google để tránh sai sót do ghép chuỗi .env
-    // Nếu bước 1 bạn thấy model khác, hãy sửa tên model ở đây
-    // Sửa dòng này trong GeminiRestAdapter.java
-private static final String GOOGLE_API_URL ="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+    // Hardcode URL model Flash cho nhanh và rẻ
+    private static final String GOOGLE_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
     public GeminiRestAdapter(@Value("${gemini.api.key}") String apiKey, ObjectMapper objectMapper) {
         this.apiKey = apiKey;
@@ -36,98 +35,120 @@ private static final String GOOGLE_API_URL ="https://generativelanguage.googleap
     }
 
     @Override
-    public StructuredIntent getStructuredIntent(String query, List<String> history) {
+    public StructuredIntent getStructuredIntent(String query, List<ChatMessage> history, String userContextInfo) {
         try {
             // 1. Setup Headers
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            //Xử lý lịch sử: Chuyển List thành String
+
+            // 2. Xử lý Lịch sử (Convert List -> String text)
             StringBuilder historyContext = new StringBuilder();
             if (history != null && !history.isEmpty()) {
-                historyContext.append("\n=== LỊCH SỬ HỘI THOẠI TRƯỚC ĐÓ ===\n");
-                for (String msg : history) {
-                    historyContext.append(msg).append("\n");
+                historyContext.append("\n=== BẮT ĐẦU LỊCH SỬ HỘI THOẠI (Context) ===\n");
+                for (ChatMessage msg : history) {
+                    // Clean nội dung để tránh lỗi JSON
+                    String cleanContent = msg.getContent() != null ? msg.getContent().replace("\"", "'") : "";
+                    historyContext.append(String.format("- %s: %s\n", msg.getRole().toUpperCase(), cleanContent));
                 }
                 historyContext.append("=== KẾT THÚC LỊCH SỬ ===\n");
+            } else {
+                historyContext.append("(Chưa có lịch sử hội thoại)");
             }
-            
-            // 2. Setup Body (Prompt)
+
+            // 3. Setup Body (Prompt Engineering)
+            // Đây là nơi ta "giới thiệu" người dùng với AI
             String systemInstruction = String.format("""
-                Bạn là trợ lý ảo quản lý lịch họp thông minh. Thời gian hiện tại là: %s.
-                
-                NHIỆM VỤ: 
-                Phân tích yêu cầu của người dùng và trích xuất thông tin ra định dạng JSON.
-                
-                CÁC INTENT (Ý ĐỊNH) CẦN NHẬN DIỆN:
-                
-                1. "SCHEDULE_MEETING": Người dùng muốn đặt phòng hoặc tạo lịch họp mới.
-                   - Yêu cầu trích xuất: title (tiêu đề), startTime, endTime, roomName, participants (số người).
-                   - Nếu user nói "họp 1 tiếng", hãy tự tính endTime = startTime + 1 giờ.
-                   
-                2. "LIST_MEETINGS": Người dùng muốn xem, kiểm tra danh sách lịch họp của họ.
-                   - Ví dụ: "Lịch của tôi hôm nay", "Mai có cuộc họp nào không", "Xem danh sách họp".
-                   - Yêu cầu trích xuất: startTime (nếu user hỏi ngày cụ thể).
-                   
-                3. "CANCEL_MEETING": Người dùng muốn hủy một cuộc họp.
-                   - Ví dụ: "Hủy cuộc họp lúc 2 giờ", "Xóa lịch họp team".
-                   - Yêu cầu trích xuất: startTime (để xác định cuộc họp nào cần hủy), cancelReason (lý do hủy).
-                   
-                4. "UNKNOWN": Câu chào hỏi (Hi, Hello) hoặc câu hỏi không liên quan đến đặt phòng.
-                
-                QUY TẮC QUAN TRỌNG (BẮT BUỘC TUÂN THỦ):
-                - KHÔNG trả về Markdown (không dùng ```json). Chỉ trả về Raw JSON.
-                - Định dạng ngày giờ: BẮT BUỘC là ISO-8601 (yyyy-MM-ddTHH:mm:ss).
-                - Nếu user không nói rõ ngày (ví dụ "9 giờ sáng"), hãy dùng ngày hiện tại hoặc ngày mai tùy ngữ cảnh gần nhất.
-                
-                MẪU JSON TRẢ VỀ:
-                {
-                  "intent": "SCHEDULE_MEETING" | "LIST_MEETINGS" | "CANCEL_MEETING" | "UNKNOWN",
-                  "title": "Tiêu đề họp",
-                  "roomName": "Tên phòng (ví dụ: Phòng A, Phòng VIP)",
-                  "startTime": "2023-11-25T14:00:00",
-                  "endTime": "2023-11-25T15:00:00",
-                  "participants": 5,
-                  "cancelReason": "Lý do hủy (nếu có)",
-                  "reply": "Câu trả lời ngắn gọn, thân thiện nếu intent là UNKNOWN"
-                }
-                
-                User request: %s
-                """, LocalDateTime.now(), query);
+    Bạn là trợ lý ảo đặt phòng họp thông minh. Thời gian hiện tại: %s.
+    
+    THÔNG TIN NGƯỜI DÙNG: %s
+    
+    NHIỆM VỤ CỦA BẠN:
+    Hỗ trợ người dùng đặt lịch họp qua các bước: Thu thập thông tin -> Chọn phòng -> Xác nhận -> Đặt.
+    
+    HÃY PHÂN TÍCH LỊCH SỬ CHAT VÀ TRẢ VỀ JSON THEO QUY TẮC SAU:
+    
+    1. INTENT: "GATHER_INFO"
+       - KHI: Người dùng muốn đặt lịch nhưng THIẾU thời gian (startTime) HOẶC số lượng người (participants).
+       - HÀNH ĐỘNG: Hỏi lại thông tin còn thiếu một cách tự nhiên.
+       
+    2. INTENT: "FIND_ROOM"
+       - KHI: Đã có đủ thời gian và số người, nhưng người dùng CHƯA chốt tên phòng cụ thể.
+       - HÀNH ĐỘNG: Trả về startTime, endTime, participants để backend tìm phòng phù hợp.
+       
+    3. INTENT: "WAIT_CONFIRMATION"
+       - KHI: Đã có đủ: Thời gian + Số người + Tên phòng (do user chọn hoặc bot gợi ý trước đó).
+       - NHƯNG: Người dùng CHƯA nói các từ khóa xác nhận như "Ok", "Đồng ý", "Chốt", "Đặt đi".
+       - HÀNH ĐỘNG: Tóm tắt lại thông tin và hỏi "Bạn có muốn chốt lịch này không?".
+       
+    4. INTENT: "EXECUTE_BOOKING"
+       - KHI: Đã đủ mọi thông tin VÀ người dùng đã nói "Ok/Đồng ý/Yes".
+       
+    5. "RESET" (Hủy thao tác hiện tại):
+       - KHI: Người dùng nói "Không", "Hủy", "Thôi", "Bỏ đi", "Cancel" KHI ĐANG TRONG QUÁ TRÌNH đặt phòng (đang hỏi giờ, đang chọn phòng, chờ xác nhận).
+       - HÀNH ĐỘNG: Dừng lại việc đặt phòng. Trả về reply: "Đã hủy thao tác."
+       
+    6. "CANCEL_MEETING" (Hủy lịch trong DB):
+       - KHI: Người dùng muốn xóa một lịch họp ĐÃ ĐẶT THÀNH CÔNG trước đó.
+       - DẤU HIỆU: Thường đi kèm mốc thời gian cụ thể (ví dụ: "Hủy lịch họp lúc 14h", "Xóa lịch chiều nay").
+       - NẾU KHÔNG CÓ THỜI GIAN: Hãy trả về Intent này nhưng để startTime = null để code hỏi lại.
+       
+    7. "FIND_ROOM" (Tìm phòng):
+       - LƯU Ý ĐẶC BIỆT: Nếu người dùng vừa nói "Không" hoặc "Chưa chốt", ĐỪNG trả về intent này nữa. Hãy chuyển sang "RESET" hoặc hỏi người dùng muốn thay đổi gì.
+    8. "LIST_MEETINGS" (Xem lịch):
+       - KHI: Người dùng muốn xem các lịch họp đã đặt.
+       - DẤU HIỆU: Các từ khóa như "Xem lịch họp", "Lịch của tôi", "Nhắc tôi về các cuộc họp".
+       - HÀNH ĐỘNG: Trả về danh sách lịch hợp
+    9. "UNKNOWN" (Tán gẫu).
+
+    MẪU JSON OUTPUT:
+    {
+      "intent": "GATHER_INFO" | "FIND_ROOM" | "WAIT_CONFIRMATION" | "EXECUTE_BOOKING",
+      "title": "Tiêu đề (nếu có)",
+      "startTime": "ISO-8601",
+      "endTime": "ISO-8601",
+      "participants": 5,
+      "roomName": "Tên phòng (nếu có)",
+      "reply": "Câu trả lời của bạn"
+    }
+
+    LỊCH SỬ HỘI THOẠI:
+    %s
+    
+    User request: %s
+    """, 
+    LocalDateTime.now(), 
+    userContextInfo, 
+    historyContext.toString(), 
+    query);
 
             GeminiRequest requestBody = new GeminiRequest();
             requestBody.setContents(List.of(new Content(List.of(new Part(systemInstruction)))));
 
             HttpEntity<GeminiRequest> entity = new HttpEntity<>(requestBody, headers);
 
-            // 3. Gọi API (Thêm key vào URL)
+            // 4. Gọi API
             String finalUrl = GOOGLE_API_URL + "?key=" + apiKey;
-            log.info("Sending request to Google AI: {}", GOOGLE_API_URL); // Log URL gốc (giấu key)
+            ResponseEntity<String> response = restTemplate.exchange(finalUrl, HttpMethod.POST, entity, String.class);
 
-            ResponseEntity<String> response = restTemplate.exchange(
-                    finalUrl, HttpMethod.POST, entity, String.class);
-
-            // 4. Xử lý kết quả
+            // 5. Xử lý kết quả
             String jsonResponse = response.getBody();
-            log.info("Google Response: {}", jsonResponse); // In ra response để debug
-
             GeminiResponse geminiResponse = objectMapper.readValue(jsonResponse, GeminiResponse.class);
-            
+
             if (geminiResponse.getCandidates() == null || geminiResponse.getCandidates().isEmpty()) {
-                return makeErrorIntent("Google không trả về dữ liệu (Candidates empty).");
+                return makeErrorIntent("Google AI không phản hồi.");
             }
 
             String rawText = geminiResponse.getCandidates().get(0).getContent().getParts().get(0).getText();
             String cleanJson = cleanJson(rawText);
-            
+
             return objectMapper.readValue(cleanJson, StructuredIntent.class);
 
         } catch (HttpClientErrorException e) {
-            // Bắt lỗi 4xx (400, 404, 403...) và IN RA MÀN HÌNH
-            log.error("Lỗi HTTP từ Google: {} - Body: {}", e.getStatusCode(), e.getResponseBodyAsString());
-            return makeErrorIntent("Lỗi HTTP " + e.getStatusCode() + ": " + e.getResponseBodyAsString());
+            log.error("Google AI Error: {}", e.getResponseBodyAsString());
+            return makeErrorIntent("Lỗi kết nối AI: " + e.getStatusCode());
         } catch (Exception e) {
             e.printStackTrace();
-            return makeErrorIntent("Lỗi hệ thống: " + e.getMessage());
+            return makeErrorIntent("Lỗi hệ thống xử lý tin nhắn.");
         }
     }
 
@@ -146,7 +167,7 @@ private static final String GOOGLE_API_URL ="https://generativelanguage.googleap
         return text;
     }
 
-    // Inner Classes
+    // Inner Classes (Giữ nguyên)
     @Data static class GeminiRequest { private List<Content> contents; }
     @Data @JsonIgnoreProperties(ignoreUnknown = true) static class GeminiResponse { private List<Candidate> candidates; }
     @Data @JsonIgnoreProperties(ignoreUnknown = true) static class Candidate { private Content content; }

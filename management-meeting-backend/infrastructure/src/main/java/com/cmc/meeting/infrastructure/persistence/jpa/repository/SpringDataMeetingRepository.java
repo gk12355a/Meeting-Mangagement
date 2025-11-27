@@ -182,4 +182,10 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
                         @Param("checkTime") LocalDateTime checkTime);
         Optional<MeetingEntity> findByCheckinCode(String checkinCode);
         List<MeetingEntity> findByOrganizerIdAndStartTime(Long organizerId, LocalDateTime startTime);
+        @Query("SELECT m FROM MeetingEntity m WHERE m.room.id = :roomId AND " +
+           "((m.startTime < :endTime) AND (m.endTime > :startTime))")
+    List<MeetingEntity> findConflicts(@Param("roomId") Long roomId, 
+                                      @Param("startTime") LocalDateTime startTime, 
+                                      @Param("endTime") LocalDateTime endTime);
+                                      
 }

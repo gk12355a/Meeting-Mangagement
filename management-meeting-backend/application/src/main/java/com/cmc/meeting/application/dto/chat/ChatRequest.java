@@ -7,5 +7,4 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class ChatRequest {
     private String query;
-    private List<String> history;
 }
