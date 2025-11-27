@@ -33,7 +33,7 @@ public class ChatbotController {
         Long currentUserId = userDetails.getId(); 
 
         // 2. Gọi service ở tầng application
-        ChatResponse response = chatbotService.processQuery(request.getQuery(), currentUserId);
+        ChatResponse response = chatbotService.processQuery(request.getQuery(), request.getHistory(), currentUserId);
         
         return ResponseEntity.ok(response);
     }

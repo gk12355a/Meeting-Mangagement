@@ -36,12 +36,21 @@ private static final String GOOGLE_API_URL ="https://generativelanguage.googleap
     }
 
     @Override
-    public StructuredIntent getStructuredIntent(String query) {
+    public StructuredIntent getStructuredIntent(String query, List<String> history) {
         try {
             // 1. Setup Headers
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-
+            //Xử lý lịch sử: Chuyển List thành String
+            StringBuilder historyContext = new StringBuilder();
+            if (history != null && !history.isEmpty()) {
+                historyContext.append("\n=== LỊCH SỬ HỘI THOẠI TRƯỚC ĐÓ ===\n");
+                for (String msg : history) {
+                    historyContext.append(msg).append("\n");
+                }
+                historyContext.append("=== KẾT THÚC LỊCH SỬ ===\n");
+            }
+            
             // 2. Setup Body (Prompt)
             String systemInstruction = String.format("""
                 Bạn là trợ lý ảo quản lý lịch họp thông minh. Thời gian hiện tại là: %s.

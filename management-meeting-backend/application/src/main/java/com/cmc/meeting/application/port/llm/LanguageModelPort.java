@@ -1,5 +1,7 @@
 package com.cmc.meeting.application.port.llm;
 
+import java.util.List;
+
 import com.cmc.meeting.application.dto.chat.StructuredIntent;
 
 public interface LanguageModelPort {
@@ -10,5 +12,5 @@ public interface LanguageModelPort {
      * @param query Câu lệnh thô của người dùng.
      * @return Một đối tượng StructuredIntent.
      */
-    StructuredIntent getStructuredIntent(String query);
+    StructuredIntent getStructuredIntent(String query, List<String> history);
 }

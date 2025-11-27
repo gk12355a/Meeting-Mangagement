@@ -45,10 +45,10 @@ public class ChatbotServiceImpl implements ChatbotService {
     }
 
    @Override
-    public ChatResponse processQuery(String query, Long userId) {
-        StructuredIntent intent = languageModelPort.getStructuredIntent(query);
+    public ChatResponse processQuery(String query, List<String> history, Long userId) {
+    // 1. Truyền history vào Adapter
+    StructuredIntent intent = languageModelPort.getStructuredIntent(query, history);
         String replyMessage;
-
         try {
             String safeIntent = (intent.getIntent() != null) ? intent.getIntent().trim().toUpperCase() : "UNKNOWN";
             
