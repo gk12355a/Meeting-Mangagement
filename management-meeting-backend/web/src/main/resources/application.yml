@@ -3,7 +3,12 @@ server:
 
 spring:
 
-
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Địa chỉ Auth Service để lấy Public Key check chữ ký
+          issuer-uri: ${OAuth2_BASE_URL}
   application:
     name: management-meeting-backend
 
