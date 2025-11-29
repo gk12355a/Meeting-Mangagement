@@ -2,7 +2,11 @@ server:
   port: 8080
 
 spring:
-
+  rabbitmq:
+    host: ${RABBITMQ_HOST}
+    port: ${RABBITMQ_PORT}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
   security:
     oauth2:
       resourceserver:

@@ -3,6 +3,7 @@ package com.cmc.meeting.web.security;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -14,6 +15,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -27,9 +29,8 @@ import java.util.List;
 public class SecurityConfig {
 
     @Autowired
-    private JwtAuthenticationFilter jwtAuthenticationFilter; // Filter cũ
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    // 1. CẤU HÌNH CORS
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
@@ -43,7 +44,6 @@ public class SecurityConfig {
         return source;
     }
 
-    // 2. BEAN CẦN THIẾT CHO LOGIN CŨ
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -54,7 +54,6 @@ public class SecurityConfig {
         return authenticationConfiguration.getAuthenticationManager();
     }
 
-    // 3. SECURITY CHAIN (LAI)
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -65,7 +64,6 @@ public class SecurityConfig {
             .httpBasic(basic -> basic.disable())
 
             .authorizeHttpRequests(auth -> auth
-                // Cho phép API Login cũ hoạt động
                 .requestMatchers(
                     "/api/v1/auth/**", 
                     "/v3/api-docs/**", 
@@ -76,10 +74,15 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
 
-            // A. Cấu hình Login cũ (Ưu tiên chạy trước)
+            // [QUAN TRỌNG 1] Xử lý lỗi 401 rõ ràng hơn
+            .exceptionHandling(e -> e
+                .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+            )
+
+            // [QUAN TRỌNG 2] Filter Cũ chạy trước
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 
-            // B. Cấu hình OAuth2 (Chạy sau nếu Filter cũ không bắt được token)
+            // [QUAN TRỌNG 3] OAuth2 Resource Server chạy song song
             .oauth2ResourceServer(oauth2 -> oauth2
                 .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
             );
@@ -87,7 +90,6 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // Converter cho OAuth2 Token
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
