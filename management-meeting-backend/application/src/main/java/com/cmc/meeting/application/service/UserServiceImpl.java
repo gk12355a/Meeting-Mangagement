@@ -40,6 +40,15 @@ public class UserServiceImpl implements UserService {
                 .collect(Collectors.toList());
     }
     @Override
+    @Transactional(readOnly = true)
+    public UserDTO getUserProfile(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new EntityNotFoundException("User not found: " + username));
+        
+        // Map sang DTO (DTO này sẽ chứa ID của Backend)
+        return modelMapper.map(user, UserDTO.class);
+    }
+    @Override
     @Transactional // (Bỏ readOnly vì đây là hàm Cập nhật)
     public UserDTO updateUserProfile(String username, UserProfileUpdateRequest request) {
         

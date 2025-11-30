@@ -3,11 +3,14 @@ package com.cmc.meeting.web.controller;
 import com.cmc.meeting.application.dto.request.UserProfileUpdateRequest;
 import com.cmc.meeting.application.dto.response.UserDTO;
 import com.cmc.meeting.application.port.service.UserService;
+import org.springframework.security.core.Authentication;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -27,6 +30,16 @@ public class UserController {
     public ResponseEntity<List<UserDTO>> searchUsers(@RequestParam String query) {
         List<UserDTO> users = userService.searchUsers(query);
         return ResponseEntity.ok(users);
+    }
+    @GetMapping("/profile")
+    @Operation(summary = "Lấy thông tin cá nhân của người dùng đang đăng nhập")
+    public ResponseEntity<UserDTO> getMyProfile() {
+        // Lấy username từ SecurityContext (đã được set bởi Filter/Converter)
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String currentUsername = authentication.getName();
+
+        UserDTO userDTO = userService.getUserProfile(currentUsername);
+        return ResponseEntity.ok(userDTO);
     }
 
     @PutMapping("/profile")
