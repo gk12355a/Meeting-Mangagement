@@ -26,22 +26,37 @@ public class UserSyncListener {
         try {
             String username = (String) userData.get("username");
             String fullName = (String) userData.get("fullName");
+            
+            // [CẢI THIỆN] Lấy Auth ID từ message
+            // Lưu ý: JSON có thể gửi Integer, cần ép kiểu về Long
+            Long authId = ((Integer) userData.get("auth_id")).longValue(); 
 
-            log.info("🐰 RabbitMQ: Nhận yêu cầu đồng bộ user: {}", username);
+            log.info("🐰 RabbitMQ: Nhận yêu cầu đồng bộ user: {}, Auth ID: {}", username, authId);
 
-            if (userRepository.findByUsername(username).isEmpty()) {
+            userRepository.findByUsername(username).ifPresentOrElse(existingUser -> {
+                // Nếu User đã tồn tại, CẬP NHẬT Auth ID
+                if (existingUser.getAuthServiceId() == null) {
+                    existingUser.setAuthServiceId(authId);
+                    userRepository.save(existingUser);
+                    log.info("🔄 Đã cập nhật Auth ID: {} cho User '{}'.", authId, username);
+                } else {
+                    log.info("User '{}' đã tồn tại và có Auth ID, bỏ qua.", username);
+                }
+            }, () -> {
+                // Nếu User chưa tồn tại, TẠO MỚI
                 User newUser = new User();
                 newUser.setUsername(username);
                 newUser.setFullName(fullName);
-                newUser.setPassword("DUMMY_PASS_SYNCED"); // Pass giả
+                // [CẢI THIỆN] Lưu Auth ID
+                newUser.setAuthServiceId(authId); 
+                newUser.setPassword("DUMMY_PASS_SYNCED"); 
                 newUser.setActive(true);
-                newUser.setRoles(new HashSet<>()); // Mặc định role rỗng hoặc ROLE_USER
+                newUser.setRoles(new HashSet<>()); 
 
                 userRepository.save(newUser);
-                log.info("✅ Đã đồng bộ User '{}' vào Meeting DB.", username);
-            } else {
-                log.info("User '{}' đã tồn tại, bỏ qua.", username);
-            }
+                log.info("✅ Đã đồng bộ User '{}' với Auth ID {} vào Meeting DB.", username, authId);
+            });
+            
         } catch (Exception e) {
             log.error("❌ Lỗi khi đồng bộ user từ RabbitMQ", e);
         }

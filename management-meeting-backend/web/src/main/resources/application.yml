@@ -70,6 +70,8 @@ springdoc:
 
 # === BỔ SUNG: Cấu hình ứng dụng ===
 app:
+  ors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS}
   jwt:
     secret: ${JWT_SECRET}
     expiration-ms: ${JWT_EXPIRATION_MS}
@@ -78,8 +80,11 @@ app:
   backend:
     base-url: ${BACKEND_BASE_URL}
 
-# === Hết ===
 
+auth:
+  service:
+    # URL để Resource Server lấy JWK Set (chứa Public Key của Auth Service)
+    jwk-set-uri: ${OAuth2_BASE_URL}/oauth2/jwks
 google:
   client:
     id: ${GOOGLE_CLIENT_ID}
