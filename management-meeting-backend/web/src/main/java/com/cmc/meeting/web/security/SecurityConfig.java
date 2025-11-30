@@ -13,9 +13,10 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter; // <-- Import quan trọng
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter; // Import này
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -30,7 +31,6 @@ public class SecurityConfig {
     @Autowired
     private JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    // Inject Custom Converter để tìm User từ DB (cho SSO)
     @Autowired
     private CustomJwtAuthenticationConverter customJwtAuthenticationConverter;
 
@@ -84,12 +84,12 @@ public class SecurityConfig {
                 .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
             )
 
-            // [QUAN TRỌNG] Đặt Filter cũ chạy TRƯỚC filter của Resource Server
-            // Filter cũ sẽ "thử" validate. Nếu thất bại (do là token SSO), nó sẽ bỏ qua (nhờ try-catch).
-            // Sau đó đến lượt BearerTokenAuthenticationFilter của Resource Server xử lý.
+            // [SỬA QUAN TRỌNG NHẤT]: Dùng .addFilterBefore thay vì .addFilterAfter
+            // Local Filter chạy TRƯỚC. 
+            // - Nếu là Token Local: Nó validate OK -> Set Auth -> Resource Server thấy có Auth rồi sẽ bỏ qua.
+            // - Nếu là Token SSO: Nó validate Fail -> Catch Exception (Debug log) -> Chuyển tiếp cho Resource Server xử lý.
             .addFilterBefore(jwtAuthenticationFilter, BearerTokenAuthenticationFilter.class)
 
-            // Cấu hình OAuth2 Resource Server (Xử lý token SSO)
             .oauth2ResourceServer(oauth2 -> oauth2
                 .jwt(jwt -> jwt
                     .jwkSetUri(jwkSetUri)
