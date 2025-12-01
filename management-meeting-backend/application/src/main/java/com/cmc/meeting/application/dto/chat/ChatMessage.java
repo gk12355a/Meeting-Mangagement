@@ -9,6 +9,6 @@ import java.io.Serializable;
 @AllArgsConstructor
 @NoArgsConstructor
 public class ChatMessage implements Serializable {
-    private String role; // "user" hoặc "model"
+    private String role;
     private String content;
 }

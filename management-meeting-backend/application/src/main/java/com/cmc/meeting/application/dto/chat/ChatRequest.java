@@ -1,5 +1,4 @@
 package com.cmc.meeting.application.dto.chat;
-import java.util.List;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
