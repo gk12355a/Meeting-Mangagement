@@ -43,11 +43,15 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
     @Override
     public Meeting save(Meeting meeting) {
         MeetingEntity entity = toEntity(meeting);
+        if (meeting.getGoogleEventId() != null) {
+            entity.setGoogleEventId(meeting.getGoogleEventId());
+        }
         MeetingEntity savedEntity = jpaRepository.save(entity);
         return toDomain(savedEntity);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<Meeting> findById(Long id) {
         return jpaRepository.findById(id).map(this::toDomain);
     }

@@ -119,4 +119,12 @@ public class Meeting {
         this.cancelReason = reason;
         this.cancelledAt = LocalDateTime.now();
     }
+
+    public String getGoogleEventId() {
+        return googleEventId;
+    }
+
+    public void setGoogleEventId(String googleEventId) {
+        this.googleEventId = googleEventId;
+    }
 }

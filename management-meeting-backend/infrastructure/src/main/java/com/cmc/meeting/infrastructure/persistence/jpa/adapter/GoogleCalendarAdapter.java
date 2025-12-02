@@ -9,8 +9,8 @@ import com.google.api.client.util.DateTime;
 import com.google.api.services.calendar.Calendar;
 import com.google.api.services.calendar.model.Event;
 import com.google.api.services.calendar.model.EventDateTime;
-import com.google.auth.http.HttpCredentialsAdapter; // Adapter mới
-import com.google.auth.oauth2.UserCredentials;    // Thay thế GoogleCredential
+import com.google.auth.http.HttpCredentialsAdapter;
+import com.google.auth.oauth2.UserCredentials;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 
 @Component
@@ -36,133 +37,136 @@ public class GoogleCalendarAdapter {
         this.userRepository = userRepository;
     }
 
-    public void pushMeetingToGoogle(Long userId, Meeting meeting) {
+    // --- 1. TẠO MỚI (PUSH) ---
+    public String pushMeetingToGoogle(Long userId, Meeting meeting) {
         try {
-            // 1. Kiểm tra user có liên kết Google không
-            UserEntity user = userRepository.findById(userId).orElse(null);
-            if (user == null) {
-                log.warn("DEBUG: User ID {} không tồn tại.", userId);
-                return; // Không sync được
-            }
-            log.info("DEBUG: User {} - Linked: {} - Token: {}", 
-                     user.getUsername(), 
-                     user.isGoogleLinked(), 
-                     (user.getGoogleRefreshToken() != null ? "CÓ" : "KHÔNG"));
-            if (user == null || !user.isGoogleLinked() || user.getGoogleRefreshToken() == null) {
-                return; 
-            }
+            Calendar service = getCalendarService(userId);
+            if (service == null) return null; // User chưa link Google
 
-            // 2.  Sử dụng UserCredentials thay vì GoogleCredential (Deprecated)
-            // Thư viện này tự động xử lý việc Refresh Token khi hết hạn
-            UserCredentials credentials = UserCredentials.newBuilder()
-                    .setClientId(clientId)
-                    .setClientSecret(clientSecret)
-                    .setRefreshToken(user.getGoogleRefreshToken())
-                    .build();
+            // Tạo Event Object
+            Event event = mapMeetingToGoogleEvent(new Event(), meeting);
 
-            // 3. Khởi tạo Calendar Service
-            // Dùng HttpCredentialsAdapter để chuyển đổi từ Auth Library sang API Client
-            Calendar service = new Calendar.Builder(
-                    GoogleNetHttpTransport.newTrustedTransport(),
-                    GsonFactory.getDefaultInstance(),
-                    new HttpCredentialsAdapter(credentials)) //Adapter ở đây
-                    .setApplicationName("CMC Meeting App")
-                    .build();
-
-            // 4. Tạo Event (Giữ nguyên logic cũ)
-            Event event = new Event()
-                    .setSummary(meeting.getTitle())
-                    .setLocation(meeting.getRoom().getName())
-                    .setDescription(meeting.getDescription());
-
-            DateTime start = new DateTime(meeting.getStartTime().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
-            event.setStart(new EventDateTime().setDateTime(start));
-
-            DateTime end = new DateTime(meeting.getEndTime().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
-            event.setEnd(new EventDateTime().setDateTime(end));
-
-            // 5. Gửi request
+            // Gửi request INSERT
             Event executedEvent = service.events().insert("primary", event).execute();
-            
+
             String googleEventId = executedEvent.getId();
-            log.info("-> Đã đồng bộ Google Calendar. ID: {}", googleEventId);
+            log.info("-> Đã tạo sự kiện Google Calendar mới. ID: {}", googleEventId);
+
+            return googleEventId;
 
         } catch (IOException | GeneralSecurityException e) {
-            log.error("Lỗi đồng bộ Google Calendar: ", e);
+            log.error("Lỗi tạo sự kiện Google Calendar: ", e);
+            return null;
         }
     }
-    public void deleteMeetingFromGoogle(Long userId, String googleEventId) {
-        try {
-            UserEntity user = userRepository.findById(userId).orElse(null);
-            // Kiểm tra điều kiện
-            if (user == null || !user.isGoogleLinked() || user.getGoogleRefreshToken() == null) return;
-            if (googleEventId == null || googleEventId.isEmpty()) return;
 
-            // Tạo Credentials (giống hàm push - nên tách ra private method nếu muốn code gọn)
-            UserCredentials credentials = UserCredentials.newBuilder()
-                    .setClientId(clientId)
-                    .setClientSecret(clientSecret)
-                    .setRefreshToken(user.getGoogleRefreshToken())
-                    .build();
-
-            Calendar service = new Calendar.Builder(
-                    GoogleNetHttpTransport.newTrustedTransport(),
-                    GsonFactory.getDefaultInstance(),
-                    new HttpCredentialsAdapter(credentials))
-                    .setApplicationName("CMC Meeting App")
-                    .build();
-
-            // GỌI GOOGLE DELETE
-            service.events().delete("primary", googleEventId).execute();
-            
-            log.info("-> Đã xóa sự kiện trên Google Calendar: {}", googleEventId);
-
-        } catch (Exception e) {
-            log.error("Lỗi khi xóa lịch trên Google: " + e.getMessage());
-        }
-    }
+    // --- 2. CẬP NHẬT (UPDATE) ---
     public void updateMeetingOnGoogle(Long userId, String googleEventId, Meeting meeting) {
         try {
-            // 1. Check quyền
-            UserEntity user = userRepository.findById(userId).orElse(null);
-            if (user == null || !user.isGoogleLinked() || user.getGoogleRefreshToken() == null) return;
             if (googleEventId == null || googleEventId.isEmpty()) return;
 
-            // 2. Tạo Service (Copy logic từ hàm push)
-            UserCredentials credentials = UserCredentials.newBuilder()
-                    .setClientId(clientId)
-                    .setClientSecret(clientSecret)
-                    .setRefreshToken(user.getGoogleRefreshToken())
-                    .build();
+            Calendar service = getCalendarService(userId);
+            if (service == null) return;
 
-            Calendar service = new Calendar.Builder(
-                    GoogleNetHttpTransport.newTrustedTransport(),
-                    GsonFactory.getDefaultInstance(),
-                    new HttpCredentialsAdapter(credentials))
-                    .setApplicationName("CMC Meeting App")
-                    .build();
+            // Lấy Event cũ về để giữ các thông tin metadata khác
+            Event event;
+            try {
+                event = service.events().get("primary", googleEventId).execute();
+            } catch (IOException e) {
+                log.warn("Không tìm thấy Google Event ID {} để update (có thể đã bị xóa trên Calendar).", googleEventId);
+                return;
+            }
 
-            // 3. Lấy Event cũ từ Google về (để giữ lại các thông tin khác nếu cần)
-            Event event = service.events().get("primary", googleEventId).execute();
+            // Map thông tin mới đè lên Event cũ
+            event = mapMeetingToGoogleEvent(event, meeting);
 
-            // 4. Cập nhật thông tin mới từ App
-            event.setSummary(meeting.getTitle());
-            event.setDescription(meeting.getDescription());
-            event.setLocation(meeting.getRoom().getName());
-
-            DateTime start = new DateTime(meeting.getStartTime().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
-            event.setStart(new EventDateTime().setDateTime(start));
-
-            DateTime end = new DateTime(meeting.getEndTime().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
-            event.setEnd(new EventDateTime().setDateTime(end));
-
-            // 5. Gửi lệnh Update (PATCH hoặc UPDATE)
+            // QUAN TRỌNG: Dùng lệnh UPDATE thay vì INSERT
             service.events().update("primary", googleEventId, event).execute();
-            
+
             log.info("-> Đã cập nhật Google Calendar thành công. ID: {}", googleEventId);
 
         } catch (Exception e) {
             log.error("Lỗi cập nhật Google Calendar: ", e);
         }
+    }
+
+    // --- 3. XÓA (DELETE) ---
+    public void deleteMeetingFromGoogle(Long userId, String googleEventId) {
+        try {
+            if (googleEventId == null || googleEventId.isEmpty()) return;
+
+            Calendar service = getCalendarService(userId);
+            if (service == null) return;
+
+            // Gửi lệnh DELETE
+            service.events().delete("primary", googleEventId).execute();
+
+            log.info("-> Đã xóa sự kiện trên Google Calendar: {}", googleEventId);
+
+        } catch (Exception e) {
+            // 404 (Not Found) hoặc 410 (Gone) nghĩa là đã xóa rồi -> Bỏ qua không báo lỗi
+            if (e.getMessage() != null && (e.getMessage().contains("404") || e.getMessage().contains("410"))) {
+                log.warn("Google Event ID {} đã không còn tồn tại.", googleEventId);
+            } else {
+                log.error("Lỗi xóa Google Calendar: ", e);
+            }
+        }
+    }
+
+    // --- PRIVATE HELPER METHODS (TÁI SỬ DỤNG CODE) ---
+
+    // Hàm tạo Service chung để tránh lặp code xác thực
+    private Calendar getCalendarService(Long userId) throws GeneralSecurityException, IOException {
+        UserEntity user = userRepository.findById(userId).orElse(null);
+        
+        if (user == null) {
+            log.warn("User ID {} không tồn tại.", userId);
+            return null;
+        }
+        
+        // Log debug trạng thái link
+        // log.debug("Check Google Link User {}: Linked={}, TokenPresent={}", 
+        //         user.getUsername(), user.isGoogleLinked(), user.getGoogleRefreshToken() != null);
+
+        if (!user.isGoogleLinked() || user.getGoogleRefreshToken() == null) {
+            return null;
+        }
+
+        UserCredentials credentials = UserCredentials.newBuilder()
+                .setClientId(clientId)
+                .setClientSecret(clientSecret)
+                .setRefreshToken(user.getGoogleRefreshToken())
+                .build();
+
+        return new Calendar.Builder(
+                GoogleNetHttpTransport.newTrustedTransport(),
+                GsonFactory.getDefaultInstance(),
+                new HttpCredentialsAdapter(credentials))
+                .setApplicationName("CMC Meeting App")
+                .build();
+    }
+
+    // Hàm Map dữ liệu chung
+    private Event mapMeetingToGoogleEvent(Event event, Meeting meeting) {
+        event.setSummary(meeting.getTitle())
+             .setDescription(meeting.getDescription())
+             .setLocation(meeting.getRoom().getName());
+
+        // Convert Start Time
+        DateTime start = convertToGoogleDateTime(meeting.getStartTime());
+        event.setStart(new EventDateTime().setDateTime(start));
+
+        // Convert End Time
+        DateTime end = convertToGoogleDateTime(meeting.getEndTime());
+        event.setEnd(new EventDateTime().setDateTime(end));
+
+        return event;
+    }
+
+    private DateTime convertToGoogleDateTime(LocalDateTime localDateTime) {
+        return new DateTime(localDateTime
+                .atZone(ZoneId.systemDefault())
+                .toInstant()
+                .toEpochMilli());
     }
 }

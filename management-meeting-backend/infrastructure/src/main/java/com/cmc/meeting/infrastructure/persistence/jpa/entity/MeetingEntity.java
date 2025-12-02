@@ -84,7 +84,6 @@ public class MeetingEntity {
 
     @Column(name = "checkin_code", unique = true)
     private String checkinCode;
-
     @Column(name = "google_event_id")
     private String googleEventId;
 }
