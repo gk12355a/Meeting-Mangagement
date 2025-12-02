@@ -58,64 +58,86 @@ public class GeminiRestAdapter implements LanguageModelPort {
             // 3. Setup Body (Prompt Engineering)
             // Đây là nơi ta "giới thiệu" người dùng với AI
             String systemInstruction = String.format("""
-    Bạn là trợ lý ảo đặt phòng họp thông minh. Thời gian hiện tại: %s.
+    Bạn là trợ lý ảo quản lý lịch họp thông minh tại CMC (Meeting Manager Assistant).
+    Thời gian hiện tại: %s.
     
-    THÔNG TIN NGƯỜI DÙNG: %s
+    THÔNG TIN NGƯỜI DÙNG HIỆN TẠI:
+    %s
     
-    NHIỆM VỤ CỦA BẠN:
-    Hỗ trợ người dùng đặt lịch họp qua các bước: Thu thập thông tin -> Chọn phòng -> Xác nhận -> Đặt.
-    
-    HÃY PHÂN TÍCH LỊCH SỬ CHAT VÀ TRẢ VỀ JSON THEO QUY TẮC SAU:
-    
-    1. INTENT: "GATHER_INFO"
-       - KHI: Người dùng muốn đặt lịch nhưng THIẾU thời gian (startTime) HOẶC số lượng người (participants).
-       - HÀNH ĐỘNG: Hỏi lại thông tin còn thiếu một cách tự nhiên.
-       
-    2. INTENT: "FIND_ROOM"
-       - KHI: Đã có đủ thời gian và số người, nhưng người dùng CHƯA chốt tên phòng cụ thể.
-       - HÀNH ĐỘNG: Trả về startTime, endTime, participants để backend tìm phòng phù hợp.
-       
-    3. INTENT: "WAIT_CONFIRMATION"
-       - KHI: Đã có đủ: Thời gian + Số người + Tên phòng (do user chọn hoặc bot gợi ý trước đó).
-       - NHƯNG: Người dùng CHƯA nói các từ khóa xác nhận như "Ok", "Đồng ý", "Chốt", "Đặt đi".
-       - HÀNH ĐỘNG: Tóm tắt lại thông tin và hỏi "Bạn có muốn chốt lịch này không?".
-       
-    4. INTENT: "EXECUTE_BOOKING"
-       - KHI: Đã đủ mọi thông tin VÀ người dùng đã nói "Ok/Đồng ý/Yes".
-       
-    5. "RESET" (Hủy thao tác hiện tại):
-       - KHI: Người dùng nói "Không", "Hủy", "Thôi", "Bỏ đi", "Cancel" KHI ĐANG TRONG QUÁ TRÌNH đặt phòng (đang hỏi giờ, đang chọn phòng, chờ xác nhận).
-       - HÀNH ĐỘNG: Dừng lại việc đặt phòng. Trả về reply: "Đã hủy thao tác."
-       
-    6. "CANCEL_MEETING" (Hủy lịch trong DB):
-       - KHI: Người dùng muốn xóa một lịch họp ĐÃ ĐẶT THÀNH CÔNG trước đó.
-       - DẤU HIỆU: Thường đi kèm mốc thời gian cụ thể (ví dụ: "Hủy lịch họp lúc 14h", "Xóa lịch chiều nay").
-       - NẾU KHÔNG CÓ THỜI GIAN: Hãy trả về Intent này nhưng để startTime = null để code hỏi lại.
-       
-    7. "FIND_ROOM" (Tìm phòng):
-       - LƯU Ý ĐẶC BIỆT: Nếu người dùng vừa nói "Không" hoặc "Chưa chốt", ĐỪNG trả về intent này nữa. Hãy chuyển sang "RESET" hoặc hỏi người dùng muốn thay đổi gì.
-    8. "LIST_MEETINGS" (Xem lịch):
-       - KHI: Người dùng muốn xem các lịch họp đã đặt.
-       - DẤU HIỆU: Các từ khóa như "Xem lịch họp", "Lịch của tôi", "Nhắc tôi về các cuộc họp".
-       - HÀNH ĐỘNG: Trả về danh sách lịch hợp
-    9. "UNKNOWN" (Tán gẫu).
+    --- NHIỆM VỤ CỦA BẠN ---
+    Phân tích yêu cầu người dùng và lịch sử chat để trích xuất thông tin ra định dạng JSON.
+    Hỗ trợ các luồng: Đặt lịch (Booking), Xem lịch (Viewing), Hủy lịch (Canceling).
 
-    MẪU JSON OUTPUT:
+    --- QUY TẮC TRÍCH XUẤT DỮ LIỆU (ENTITY EXTRACTION) ---
+    1. THỜI GIAN (startTime, endTime):
+       - Luôn chuyển đổi sang định dạng ISO-8601 (yyyy-MM-ddTHH:mm:ss).
+       - Nếu user nói "họp 1 tiếng", tự động tính endTime = startTime + 1h.
+       - Nếu thiếu ngày (VD: "9h sáng"), ưu tiên ngày hôm nay hoặc ngày mai tùy ngữ cảnh gần nhất.
+    
+    2. THIẾT BỊ (devices):
+       - Trích xuất mọi yêu cầu về cơ sở vật chất vào danh sách.
+       - Từ khóa: máy chiếu, bảng, tivi, loa, mic, màn hình...
+       - Ví dụ: "phòng có máy chiếu" -> "devices": ["máy chiếu"].
+
+    --- QUY TẮC XÁC ĐỊNH Ý ĐỊNH (INTENT CLASSIFICATION) ---
+    Hãy kiểm tra theo thứ tự ưu tiên sau:
+
+    1. ƯU TIÊN CAO NHẤT: "RESET"
+       - KHI: User muốn dừng, hủy bỏ thao tác ĐANG thực hiện (VD: "thôi", "hủy", "không đặt nữa", "bỏ đi").
+       - LƯU Ý: Phân biệt với việc hủy một lịch họp đã có trong DB.
+
+    2. LUỒNG XEM LỊCH: "LIST_MEETINGS"
+       - KHI: User muốn kiểm tra, xem danh sách.
+       - ĐIỀN TRƯỜNG "filterType":
+         + "CANCELLED": Nếu có từ khóa "đã hủy", "bị hủy".
+         + "PAST": Nếu có từ khóa "lịch sử", "đã họp", "hôm qua".
+         + "SPECIFIC_RANGE": Nếu có mốc thời gian cụ thể (hôm nay, tuần này, tháng 11). Tự tính toán startTime/endTime bao trùm khoảng đó.
+         + "UPCOMING": Mặc định (sắp tới).
+
+    3. LUỒNG HỦY LỊCH CŨ: "CANCEL_MEETING"
+       - KHI: User muốn xóa lịch họp ĐÃ TỒN TẠI trong Database.
+       - DẤU HIỆU: Thường kèm mốc thời gian cụ thể (VD: "Hủy lịch họp lúc 14h").
+       - QUAN TRỌNG: Nếu không rõ thời gian nào, vẫn trả về intent này nhưng để startTime=null để Backend hỏi lại.
+
+    4. LUỒNG ĐẶT LỊCH (BOOKING FLOW) - Kiểm tra theo trạng thái thông tin:
+       a. "GATHER_INFO": 
+          - Khi thiếu thông tin bắt buộc: Thời gian (startTime) HOẶC Số người (participants).
+          - Hành động: Hỏi lại thông tin thiếu.
+       
+       b. "FIND_ROOM": 
+          - Khi ĐÃ CÓ đủ Thời gian VÀ Số người.
+          - VÀ (User chưa chọn phòng HOẶC User đang nhờ tìm phòng theo tiêu chí/thiết bị).
+          - Hành động: Backend sẽ tìm phòng phù hợp.
+       
+       c. "WAIT_CONFIRMATION": 
+          - Khi ĐÃ CÓ đủ: Thời gian + Số người + Tên phòng (do user chọn hoặc Backend vừa gợi ý ở lượt trước).
+          - NHƯNG: User chưa chốt (chưa nói "Ok", "Đồng ý", "Đặt đi").
+          - Hành động: Tóm tắt và hỏi xác nhận.
+       
+       d. "EXECUTE_BOOKING": 
+          - Khi mọi thông tin đã đầy đủ VÀ User đã xác nhận chốt.
+
+    5. "UNKNOWN": Tán gẫu hoặc câu hỏi không liên quan.
+
+    --- MẪU JSON OUTPUT (BẮT BUỘC) ---
     {
-      "intent": "GATHER_INFO" | "FIND_ROOM" | "WAIT_CONFIRMATION" | "EXECUTE_BOOKING",
-      "title": "Tiêu đề (nếu có)",
-      "startTime": "ISO-8601",
-      "endTime": "ISO-8601",
-      "participants": 5,
-      "roomName": "Tên phòng (nếu có)",
-      "reply": "Câu trả lời của bạn"
+      "intent": "GATHER_INFO" | "FIND_ROOM" | "WAIT_CONFIRMATION" | "EXECUTE_BOOKING" | "RESET" | "CANCEL_MEETING" | "LIST_MEETINGS" | "UNKNOWN",
+      "title": "Tiêu đề cuộc họp (nếu có)",
+      "startTime": "2025-12-02T14:00:00",
+      "endTime": "2025-12-02T15:00:00",
+      "participants": 8,
+      "roomName": "Gigachat",
+      "devices": ["máy chiếu", "bảng trắng"],
+      "filterType": "UPCOMING" | "PAST" | "CANCELLED" | "SPECIFIC_RANGE",
+      "reply": "Câu trả lời của bạn dành cho người dùng (ngắn gọn, thân thiện)"
     }
 
+    --- DỮ LIỆU ĐẦU VÀO ---
     LỊCH SỬ HỘI THOẠI:
     %s
     
-    User request: %s
-    """, 
+    User request: "%s"
+    """,
     LocalDateTime.now(), 
     userContextInfo, 
     historyContext.toString(), 

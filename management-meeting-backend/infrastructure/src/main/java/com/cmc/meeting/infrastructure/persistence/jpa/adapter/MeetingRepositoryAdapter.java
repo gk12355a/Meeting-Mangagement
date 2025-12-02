@@ -4,6 +4,7 @@ import com.cmc.meeting.domain.model.Device;
 import com.cmc.meeting.domain.model.Meeting;
 import com.cmc.meeting.domain.model.MeetingParticipant;
 import com.cmc.meeting.domain.model.User;
+import com.cmc.meeting.domain.model.BookingStatus;
 import com.cmc.meeting.domain.port.repository.MeetingRepository;
 import com.cmc.meeting.domain.port.repository.UserRepository;
 import com.cmc.meeting.infrastructure.persistence.jpa.entity.DeviceEntity;
@@ -307,6 +308,31 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
         // Map từ Entity (DB) sang Model (Domain)
         return entities.stream()
                 .map(this::toDomain) // Hoặc logic map thủ công của bạn
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Meeting> findMeetingsByFilter(Long userId, LocalDateTime from, LocalDateTime to, boolean isCancelled) {
+       // 1. Lấy tất cả cuộc họp của user trong khoảng thời gian đó (kể cả hủy hay không hủy)
+        List<MeetingEntity> entities = jpaRepository.findByOrganizerIdAndStartTimeBetween(userId, from, to);
+
+        // 2. Lọc và Map sang Domain
+        return entities.stream()
+                .map(this::toDomain) // Chuyển sang Meeting Domain
+                .filter(m -> {
+                    // Logic lọc:
+                    if (isCancelled) {
+                        // Nếu user muốn xem lịch hủy -> Chỉ lấy status CANCELLED
+                        return m.getStatus() == BookingStatus.CANCELLED;
+                    } else {
+                        // Nếu user muốn xem lịch thường -> Lấy tất cả TRỪ status CANCELLED
+                        return m.getStatus() != BookingStatus.CANCELLED 
+                            && m.getStatus() != BookingStatus.REJECTED;
+                    }
+                })
+                // Sắp xếp tăng dần theo thời gian (cũ nhất -> mới nhất)
+                // Hoặc reversed() nếu muốn mới nhất lên đầu
+                .sorted(Comparator.comparing(Meeting::getStartTime)) 
                 .collect(Collectors.toList());
     }
 }

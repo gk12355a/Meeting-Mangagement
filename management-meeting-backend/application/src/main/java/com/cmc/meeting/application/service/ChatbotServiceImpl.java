@@ -11,6 +11,7 @@ import com.cmc.meeting.application.port.service.MeetingService;
 import com.cmc.meeting.domain.model.Meeting;
 import com.cmc.meeting.domain.model.Room;
 import com.cmc.meeting.domain.model.User;
+import com.cmc.meeting.domain.model.BookingStatus; // <--- Import mới
 import com.cmc.meeting.domain.port.repository.MeetingRepository;
 import com.cmc.meeting.domain.port.repository.RoomRepository;
 import com.cmc.meeting.domain.port.repository.UserRepository; 
@@ -22,6 +23,7 @@ import com.cmc.meeting.domain.model.RoomStatus;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Optional;
@@ -41,7 +43,6 @@ public class ChatbotServiceImpl implements ChatbotService {
     private final ChatHistoryPort chatHistoryPort;
     private final UserRepository userRepository; 
 
-    // Constructor Injection
     public ChatbotServiceImpl(LanguageModelPort languageModelPort,
                               MeetingService meetingService,
                               RoomRepository roomRepository,
@@ -62,46 +63,41 @@ public class ChatbotServiceImpl implements ChatbotService {
         User user = userRepository.findById(userId).orElseThrow();
         String userInfoContext = String.format("Tên: %s, ID: %d", user.getFullName(), user.getId());
 
-        // Gọi AI
         StructuredIntent intent = languageModelPort.getStructuredIntent(query, redisHistory, userInfoContext);
         
-        String replyMessage = intent.getReply(); // Mặc định lấy câu trả lời của AI
+        String replyMessage = intent.getReply();
         String safeIntent = (intent.getIntent() != null) ? intent.getIntent().trim().toUpperCase() : "UNKNOWN";
 
         System.out.println("🔍 Intent: " + safeIntent);
 
         try {
             switch (safeIntent) {
-                // TRƯỜNG HỢP 1: AI thấy thiếu thông tin -> AI tự hỏi lại (Logic nằm ở Prompt)
                 case "GATHER_INFO":
                 case "WAIT_CONFIRMATION": 
                 case "UNKNOWN":
-                    // Không làm gì cả, trả về câu reply của AI (Ví dụ: "Bạn muốn họp lúc mấy giờ?")
                     break;
 
-                // TRƯỜNG HỢP 2: Đủ giờ/người -> Cần tìm phòng phù hợp
                 case "FIND_ROOM":
                     replyMessage = handleFindAvailableRoom(intent);
                     break;
 
-                // TRƯỜNG HỢP 3: Chốt đơn -> Đặt phòng
                 case "EXECUTE_BOOKING":
-                case "SCHEDULE_MEETING": // Hỗ trợ cả intent cũ
+                case "SCHEDULE_MEETING":
                     replyMessage = handleScheduleMeeting(intent, userId);
                     break;
 
                 case "LIST_MEETINGS":
-                    replyMessage = handleListMeetings(userId);
+                    // SỬA: Truyền cả intent vào để lấy filterType và time
+                    replyMessage = handleListMeetings(userId, intent);
                     break;
                     
                 case "CANCEL_MEETING":
                     replyMessage = handleCancelMeeting(intent, userId);
                     break;
+
                 case "RESET":
-                    // Xóa lịch sử trong Redis để Bot quên context cũ đi
                     chatHistoryPort.clearHistory(userId);
-                    replyMessage = "✅ Đã hủy thao tác đặt phòng. Bạn cần giúp gì khác không?";
-                    // Không lưu câu "Hủy" này vào history mới nữa để tránh nhiễu
+                    replyMessage = "✅ Đã hủy thao tác. Bạn cần giúp gì khác không?";
                     return new ChatResponse(replyMessage);
             }
         } catch (Exception e) {
@@ -109,62 +105,94 @@ public class ChatbotServiceImpl implements ChatbotService {
             replyMessage = "❌ Lỗi: " + e.getMessage();
         }
         
-        // 4. Lưu lịch sử
         chatHistoryPort.addMessage(userId, "user", query);
         chatHistoryPort.addMessage(userId, "model", replyMessage);
         
         return new ChatResponse(replyMessage);
     }
-    private String handleFindAvailableRoom(StructuredIntent intent) {
-        // 1. Validate Thời gian (Giữ nguyên)
-        if (intent.getStartTime() == null || intent.getEndTime() == null) {
-            return "Tôi cần biết thời gian cụ thể (giờ bắt đầu - kết thúc) để kiểm tra phòng trống.";
+
+    // --- HÀM XỬ LÝ LIST MEETINGS MỚI (LINH HOẠT HƠN) ---
+    private String handleListMeetings(Long userId, StructuredIntent intent) {
+        String filterType = intent.getFilterType() != null ? intent.getFilterType() : "UPCOMING";
+        LocalDateTime from = intent.getStartTime();
+        LocalDateTime to = intent.getEndTime();
+        LocalDateTime now = LocalDateTime.now();
+        
+        List<Meeting> meetings;
+        String titleHeader;
+
+        // Xử lý mặc định thời gian nếu AI chưa tính toán
+        if (from == null) from = now;
+        if (to == null) to = now.plusYears(1); // Mặc định lấy xa xa
+
+        switch (filterType) {
+            case "CANCELLED":
+                // Lấy các cuộc họp đã hủy (trong 30 ngày gần đây nếu không chỉ định ngày)
+                LocalDateTime cancelFrom = (intent.getStartTime() != null) ? intent.getStartTime() : now.minusDays(30);
+                meetings = meetingRepository.findMeetingsByFilter(userId, cancelFrom, to, true);
+                titleHeader = "🗑️ **Các cuộc họp ĐÃ HỦY:**";
+                break;
+
+            case "PAST":
+                // Lịch sử: Lấy từ 30 ngày trước đến hiện tại
+                LocalDateTime pastFrom = (intent.getStartTime() != null) ? intent.getStartTime() : now.minusDays(30);
+                meetings = meetingRepository.findMeetingsByFilter(userId, pastFrom, now, false);
+                titleHeader = "clock_history **Lịch sử cuộc họp (Đã qua):**";
+                break;
+
+            case "SPECIFIC_RANGE":
+                // Xem theo ngày/tháng cụ thể user yêu cầu
+                if (intent.getStartTime() == null || intent.getEndTime() == null) {
+                    return "⚠️ Tôi cần biết khoảng thời gian cụ thể (VD: hôm nay, tuần này).";
+                }
+                meetings = meetingRepository.findMeetingsByFilter(userId, intent.getStartTime(), intent.getEndTime(), false);
+                
+                DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("dd/MM");
+                titleHeader = String.format("📅 **Lịch họp từ %s đến %s:**", 
+                        intent.getStartTime().format(dateFmt), intent.getEndTime().format(dateFmt));
+                break;
+
+            case "UPCOMING":
+            default:
+                // Mặc định: Lấy tương lai (Start > Now)
+                meetings = meetingRepository.findMeetingsByFilter(userId, now, to, false);
+                // Giới hạn 5 cuộc họp sắp tới để không bị spam
+                if (meetings.size() > 5) {
+                    meetings = meetings.subList(0, 5);
+                }
+                titleHeader = "📅 **Lịch họp sắp tới của bạn:**";
+                break;
         }
 
-        // 2. SỬA ĐỔI: Validate Số người
-        // Nếu AI không trích xuất được số người (null hoặc 0), HỎI LẠI NGAY thay vì đoán mò.
-        if (intent.getParticipants() == null || intent.getParticipants() <= 0) {
-            return "Cuộc họp này dự kiến có bao nhiêu người tham gia vậy bạn?";
-        }
-        
-        int participants = intent.getParticipants();
-
-        // 3. Logic tìm phòng
-        List<Room> allRooms = roomRepository.findAll(); 
-        
-        List<Room> suitableRooms = allRooms.stream()
-                // --- UPDATE 1: CHỈ LẤY PHÒNG ĐANG HOẠT ĐỘNG ---
-                .filter(r -> r.getStatus() == RoomStatus.AVAILABLE) 
-                // ----------------------------------------------
-                
-                // Check sức chứa
-                .filter(r -> r.getCapacity() >= participants)
-                
-                // Check trùng lịch
-                .filter(r -> isRoomAvailable(r.getId(), intent.getStartTime(), intent.getEndTime()))
-                
-                // Sắp xếp: Ưu tiên phòng nhỏ nhất vừa đủ (để tiết kiệm phòng lớn)
-                .sorted(Comparator.comparingInt(Room::getCapacity)) 
-                .toList();
-
-        if (suitableRooms.isEmpty()) {
-            return String.format("Rất tiếc, không có phòng nào TRỐNG hoặc ĐANG HOẠT ĐỘNG vào lúc %s phù hợp cho %d người.",
-                    intent.getStartTime().format(DateTimeFormatter.ofPattern("HH:mm")), participants);
+        if (meetings.isEmpty()) {
+            return titleHeader + "\n_(Không tìm thấy cuộc họp nào)_";
         }
 
-        // Lấy phòng tốt nhất
-        Room suggested = suitableRooms.get(0);
-        
-        // Lưu thông tin phòng vào context phản hồi để AI nắm được
-        return String.format("✅ Tôi tìm thấy **%s** (Sức chứa: %d người) đang trống và phù hợp.\nBạn có muốn chốt đặt phòng này không?", 
-                suggested.getName(), suggested.getCapacity());       
+        StringBuilder sb = new StringBuilder(titleHeader + "\n");
+        DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm");
+        DateTimeFormatter dateFmtFull = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+        for (Meeting m : meetings) {
+            String statusIcon = (m.getStatus() == BookingStatus.CANCELLED) ? "❌" : "✅";
+            sb.append(String.format("%s **%s**\n   🕒 %s - %s\n   📍 %s\n",
+                    statusIcon,
+                    m.getTitle(),
+                    m.getStartTime().format(timeFmt),
+                    m.getStartTime().format(dateFmtFull),
+                    m.getRoom().getName()));
+        }
+        return sb.toString();
     }
-
-    // ... Các hàm handleScheduleMeeting, handleListMeetings, handleCancelMeeting giữ nguyên như cũ ...
     private String handleScheduleMeeting(StructuredIntent intent, Long organizerId) {
         MeetingCreationRequest request = new MeetingCreationRequest();
         request.setTitle(intent.getTitle() != null ? intent.getTitle() : "Họp nhanh (từ Chatbot)");
-        request.setDescription("Được tạo tự động bởi AI Chatbot");
+        
+        // Cải thiện description
+        String desc = "Được tạo tự động bởi AI Chatbot.";
+        if (intent.getParticipants() != null && intent.getParticipants() > 1) {
+            desc += String.format(" Dự kiến số lượng: %d người.", intent.getParticipants());
+        }
+        request.setDescription(desc);
 
         if (intent.getStartTime() == null || intent.getEndTime() == null) {
             throw new IllegalArgumentException("Thời gian không hợp lệ. Vui lòng cung cấp giờ bắt đầu và kết thúc.");
@@ -197,25 +225,6 @@ public class ChatbotServiceImpl implements ChatbotService {
                 newMeeting.getStartTime(),
                 newMeeting.getEndTime());
     }
-
-    private String handleListMeetings(Long userId) {
-        Page<MeetingDTO> meetings = meetingService.getMyMeetings(userId, PageRequest.of(0, 5));
-
-        if (meetings.isEmpty()) {
-            return "📅 Hôm nay bạn không có lịch họp nào sắp tới.";
-        }
-
-        StringBuilder sb = new StringBuilder("📅 **Lịch họp sắp tới của bạn:**\n");
-        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("HH:mm dd/MM");
-
-        for (MeetingDTO m : meetings.getContent()) {
-            sb.append(String.format("- **%s** lúc %s tại %s\n",
-                    m.getTitle(),
-                    m.getStartTime().format(fmt),
-                    m.getRoom().getName()));
-        }
-        return sb.toString();
-    }
     
     private String handleCancelMeeting(StructuredIntent intent, Long userId) {
         if (intent.getStartTime() == null) {
@@ -232,8 +241,83 @@ public class ChatbotServiceImpl implements ChatbotService {
         meetingService.cancelMeeting(meeting.getId(), cancelRequest, userId);
         return String.format("✅ Đã hủy thành công cuộc họp: **%s**", meeting.getTitle());
     }
+
     private boolean isRoomAvailable(Long roomId, LocalDateTime start, LocalDateTime end) {
         List<Meeting> conflicts = meetingRepository.findConflicts(roomId, start, end);
         return conflicts.isEmpty();
     }
+    private String handleFindAvailableRoom(StructuredIntent intent) {
+        // 1. Validate Thời gian & Số người (Giữ nguyên code cũ)
+        if (intent.getStartTime() == null || intent.getEndTime() == null) {
+            return "Tôi cần biết thời gian cụ thể (giờ bắt đầu - kết thúc) để kiểm tra phòng trống.";
+        }
+        
+        // Mặc định là 0 để logic lọc bên dưới xử lý (hoặc giữ nguyên logic check null của bạn)
+        int participants = (intent.getParticipants() != null) ? intent.getParticipants() : 0; 
+        // Cập nhật số lượng người thực tế (Người tạo + Số người tìm thấy)
+        // Hoặc lấy max giữa con số user nói và số lượng tìm thấy
+        List<String> requiredDevices = intent.getDevices();
+
+        // 3. Logic tìm phòng nâng cao
+        List<Room> allRooms = roomRepository.findAll(); 
+        
+        List<Room> suitableRooms = allRooms.stream()
+                .filter(r -> r.getStatus() == RoomStatus.AVAILABLE)
+                // Filter theo số người (nếu có yêu cầu)
+                .filter(r -> participants == 0 || r.getCapacity() >= participants)
+                // Check trùng lịch
+                .filter(r -> isRoomAvailable(r.getId(), intent.getStartTime(), intent.getEndTime()))
+                
+                // --- BỘ LỌC THIẾT BỊ (MỚI) ---
+                .filter(r -> hasAllDevices(r, requiredDevices))
+                // -----------------------------
+                
+                .sorted(Comparator.comparingInt(Room::getCapacity)) 
+                .toList();
+
+        // Xử lý thông báo kết quả (Logic thông minh hơn)
+        if (suitableRooms.isEmpty()) {
+            String deviceMsg = (requiredDevices != null && !requiredDevices.isEmpty()) 
+                    ? " có đủ các thiết bị: " + String.join(", ", requiredDevices) 
+                    : "";
+            
+            return String.format("Rất tiếc, không có phòng nào trống vào lúc %s phù hợp cho %d người%s.",
+                    intent.getStartTime().format(DateTimeFormatter.ofPattern("HH:mm")), 
+                    participants, 
+                    deviceMsg);
+        }
+
+        Room suggested = suitableRooms.get(0);
+        
+        // Tạo thông báo gợi ý có nhắc đến thiết bị
+        String deviceNote = "";
+        if (requiredDevices != null && !requiredDevices.isEmpty()) {
+            deviceNote = "\n(Đã bao gồm: " + String.join(", ", requiredDevices) + ")";
+        }
+
+        return String.format("✅ Tôi tìm thấy **%s** (Sức chứa: %d người)%s đang trống.\nBạn có muốn chốt đặt phòng này không?", 
+                suggested.getName(), suggested.getCapacity(), deviceNote);       
+    }
+    private boolean hasAllDevices(Room room, List<String> requiredDevices) {
+        // Nếu user không yêu cầu thiết bị gì -> Phòng nào cũng thỏa mãn -> Return true
+        if (requiredDevices == null || requiredDevices.isEmpty()) {
+            return true;
+        }
+
+        // Nếu phòng không có thiết bị nào -> Return false
+        if (room.getFixedDevices() == null || room.getFixedDevices().isEmpty()) {
+            return false;
+        }
+
+        // Kiểm tra: Với mọi thiết bị user cần, phòng phải có ít nhất 1 cái tương ứng
+        // Logic: "máy chiếu" match với "Máy chiếu Sony", "Projector"
+        for (String req : requiredDevices) {
+            boolean found = room.getFixedDevices().stream()
+                    .anyMatch(dbDevice -> dbDevice.toLowerCase().contains(req.toLowerCase()));
+            
+            if (!found) return false; // Thiếu 1 cái là loại luôn
+        }
+        return true; // Có đủ hết
+    }
+
 }

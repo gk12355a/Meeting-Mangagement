@@ -184,8 +184,18 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
         List<MeetingEntity> findByOrganizerIdAndStartTime(Long organizerId, LocalDateTime startTime);
         @Query("SELECT m FROM MeetingEntity m WHERE m.room.id = :roomId AND " +
            "((m.startTime < :endTime) AND (m.endTime > :startTime))")
-    List<MeetingEntity> findConflicts(@Param("roomId") Long roomId, 
+        List<MeetingEntity> findConflicts(@Param("roomId") Long roomId, 
                                       @Param("startTime") LocalDateTime startTime, 
                                       @Param("endTime") LocalDateTime endTime);
+        @Query("SELECT m FROM MeetingEntity m WHERE m.organizer.id = :userId " +
+       "AND m.startTime >= :from AND m.startTime <= :to " +
+       "AND (:isCancelled = true OR m.status != 'CANCELLED') " + // Nếu tìm cancelled thì lấy tất, nếu không thì loại bỏ cancelled
+       "AND (:isCancelled = false OR m.status = 'CANCELLED') " + // Logic này để tách biệt cancelled và active
+       "ORDER BY m.startTime ASC")
+        List<MeetingEntity> findMeetingsByFilter(@Param("userId") Long userId, 
+                                         @Param("from") LocalDateTime from, 
+                                         @Param("to") LocalDateTime to,
+                                         @Param("isCancelled") boolean isCancelled);
+        List<MeetingEntity> findByOrganizerIdAndStartTimeBetween(Long organizerId, LocalDateTime from, LocalDateTime to);
                                       
 }

@@ -65,4 +65,5 @@ public interface MeetingRepository {
     Optional<Meeting> findByCheckinCode(String checkinCode);
     List<Meeting> findByOrganizerIdAndStartTime(Long organizerId, LocalDateTime startTime);
     List<Meeting> findConflicts(Long roomId, LocalDateTime startTime, LocalDateTime endTime);
+    List<Meeting> findMeetingsByFilter(Long userId, LocalDateTime from, LocalDateTime to, boolean isCancelled);
 }

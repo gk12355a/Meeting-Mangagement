@@ -13,16 +13,19 @@ public interface SpringDataUserRepository extends JpaRepository<UserEntity, Long
 
     Optional<UserEntity> findByUsername(String username);
 
-
     // BỔ SUNG: Để Chatbot tìm ID người dùng từ tên (ví dụ: "mời Hùng")
+    // Spring Data tự động sinh query: SELECT ... FROM ... WHERE LOWER(fullName) LIKE LOWER(%name%)
     List<UserEntity> findByFullNameContainingIgnoreCase(String fullName);
 
-    // Query search tổng hợp của bạn
+    // Query search tổng hợp (Tìm theo Tên hoặc Username)
     @Query("SELECT u FROM UserEntity u WHERE " +
-            "LOWER(u.fullName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
-            "LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%'))")
+           "LOWER(u.fullName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%'))")
     List<UserEntity> searchByNameOrUsername(@Param("query") String query);
 
-    @Query("SELECT u FROM UserEntity u JOIN u.roles r WHERE r = 'ROLE_ADMIN' AND u.isActive = true")
+    // --- SỬA QUERY NÀY ---
+    // Giả sử RoleEntity có trường 'name' lưu tên role (ví dụ: ROLE_ADMIN)
+    // Và UserEntity có trường 'isActive' (hoặc 'enabled', hãy kiểm tra lại entity của bạn)
+    @Query("SELECT u FROM UserEntity u JOIN u.roles r WHERE r.name = 'ROLE_ADMIN' AND u.isActive = true")
     List<UserEntity> findAllAdmins();
 }
