@@ -32,6 +32,7 @@ public class SecurityConfig {
     @Autowired
     private CustomJwtAuthenticationConverter customJwtAuthenticationConverter;
 
+    // Sử dụng EntryPoint đã được sửa đổi ở trên
     @Autowired
     private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
@@ -48,7 +49,7 @@ public class SecurityConfig {
         configuration.setAllowedMethods(List.of("*"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
-        
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
@@ -60,17 +61,19 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration)
+            throws Exception {
         return authenticationConfiguration.getAuthenticationManager();
     }
 
+    // Decoder Hybrid (Giữ nguyên, cái này đang hoạt động tốt)
     @Bean
     public JwtDecoder jwtDecoder() {
         NimbusJwtDecoder ssoDecoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
 
         SecretKeySpec secretKey = new SecretKeySpec(localJwtSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA512");
         NimbusJwtDecoder localDecoder = NimbusJwtDecoder.withSecretKey(secretKey)
-                .macAlgorithm(MacAlgorithm.HS512) 
+                .macAlgorithm(MacAlgorithm.HS512)
                 .build();
 
         return token -> {
@@ -92,14 +95,15 @@ public class SecurityConfig {
             .httpBasic(basic -> basic.disable())
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
-                    "/api/v1/auth/**", 
-                    "/v3/api-docs/**", 
-                    "/swagger-ui/**", 
+                    "/api/v1/auth/**",
+                    "/v3/api-docs/**",
+                    "/swagger-ui/**",
                     "/swagger-ui.html",
                     "/api/v1/meetings/respond-by-link"
                 ).permitAll()
                 .anyRequest().authenticated()
             )
+            // [CẤU HÌNH QUAN TRỌNG] Sử dụng EntryPoint đã sửa
             .exceptionHandling(e -> e
                 .authenticationEntryPoint(jwtAuthenticationEntryPoint)
             )
@@ -108,9 +112,10 @@ public class SecurityConfig {
                     .decoder(jwtDecoder())
                     .jwtAuthenticationConverter(customJwtAuthenticationConverter)
                 )
-                .authenticationEntryPoint(jwtAuthenticationEntryPoint) 
+                // Cần thiết để bắt lỗi ngay tại tầng Resource Server
+                .authenticationEntryPoint(jwtAuthenticationEntryPoint)
             );
-        
+
         return http.build();
     }
 }
