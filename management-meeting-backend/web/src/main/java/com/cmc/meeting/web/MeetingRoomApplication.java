@@ -34,7 +34,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class MeetingRoomApplication {
 
     public static void main(String[] args) {
-
         SpringApplication.run(MeetingRoomApplication.class, args);
     }
 }

@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: gk123a/backend:v2 # Image backend của bạn
+          image: gk123a/backend:v3 # Image backend của bạn
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
