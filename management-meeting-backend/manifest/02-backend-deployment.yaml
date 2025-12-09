@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+  namespace: meeting-system
+  labels:
+    app: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: gk123a/backend:v2 # Image backend của bạn
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          
+          # Nạp toàn bộ biến môi trường từ ConfigMap và Secret
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-secrets
+          
+          # Cấu hình thêm URL kết nối JDBC (Nếu code Java không tự ghép từ DB_HOST/PORT)
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:mysql://$(DB_HOST):$(DB_PORT)/$(DB_NAME)?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: backend-config
+                  key: DB_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secrets
+                  key: DB_PASSWORD
+
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
