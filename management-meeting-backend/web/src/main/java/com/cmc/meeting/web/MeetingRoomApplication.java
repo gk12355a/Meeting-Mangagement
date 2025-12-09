@@ -1,6 +1,5 @@
 package com.cmc.meeting.web;
 
-import io.github.cdimascio.dotenv.Dotenv;
 import org.mybatis.spring.annotation.MapperScan; // <-- 1. Import mới
 import org.springframework.amqp.rabbit.annotation.EnableRabbit;
 import org.springframework.boot.SpringApplication;
