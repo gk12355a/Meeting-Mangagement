@@ -32,7 +32,6 @@ public class SecurityConfig {
     @Autowired
     private CustomJwtAuthenticationConverter customJwtAuthenticationConverter;
 
-    // Sử dụng EntryPoint đã được sửa đổi ở trên
     @Autowired
     private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
@@ -42,12 +41,25 @@ public class SecurityConfig {
     @Value("${app.jwt.secret}")
     private String localJwtSecret;
 
+    // [MỚI] Inject danh sách Allowed Origins từ application.yml
+    // Spring sẽ tự động chuyển chuỗi phân cách bằng dấu phẩy thành List
+    @Value("#{'${app.cors.allowed-origins}'.split(',')}")
+    private List<String> allowedOrigins;
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("*"));
-        configuration.setAllowedMethods(List.of("*"));
+        
+        // [CẬP NHẬT] Sử dụng biến môi trường thay vì "*"
+        configuration.setAllowedOrigins(allowedOrigins);
+        
+        // Cấu hình các method cho phép
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        
+        // Cho phép tất cả headers
         configuration.setAllowedHeaders(List.of("*"));
+        
+        // Cho phép gửi Cookie/Credentials
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -66,7 +78,6 @@ public class SecurityConfig {
         return authenticationConfiguration.getAuthenticationManager();
     }
 
-    // Decoder Hybrid (Giữ nguyên, cái này đang hoạt động tốt)
     @Bean
     public JwtDecoder jwtDecoder() {
         NimbusJwtDecoder ssoDecoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
@@ -103,7 +114,6 @@ public class SecurityConfig {
                 ).permitAll()
                 .anyRequest().authenticated()
             )
-            // [CẤU HÌNH QUAN TRỌNG] Sử dụng EntryPoint đã sửa
             .exceptionHandling(e -> e
                 .authenticationEntryPoint(jwtAuthenticationEntryPoint)
             )
@@ -112,7 +122,6 @@ public class SecurityConfig {
                     .decoder(jwtDecoder())
                     .jwtAuthenticationConverter(customJwtAuthenticationConverter)
                 )
-                // Cần thiết để bắt lỗi ngay tại tầng Resource Server
                 .authenticationEntryPoint(jwtAuthenticationEntryPoint)
             );
 

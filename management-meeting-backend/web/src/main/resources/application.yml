@@ -70,7 +70,7 @@ springdoc:
 
 # === BỔ SUNG: Cấu hình ứng dụng ===
 app:
-  ors:
+  cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS}
   jwt:
     secret: ${JWT_SECRET}
