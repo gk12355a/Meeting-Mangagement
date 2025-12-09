@@ -16,7 +16,7 @@ spec:
         app: backend
     spec:
       hostAliases:
-        - ip: "10.111.240.47" # <--- THAY BẰNG IP CỦA OAUTH-SVC 
+        - ip: "192.168.23.114" #ip lb
           hostnames:
             - "oauth-meeting.co"
       containers:
