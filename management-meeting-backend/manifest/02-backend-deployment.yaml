@@ -15,6 +15,10 @@ spec:
       labels:
         app: backend
     spec:
+      hostAliases:
+        - ip: "10.111.240.47" # <--- THAY BẰNG IP CỦA OAUTH-SVC 
+          hostnames:
+            - "oauth-meeting.co"
       containers:
         - name: backend
           image: gk123a/backend:v3 # Image backend của bạn
