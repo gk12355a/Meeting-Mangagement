@@ -19,6 +19,7 @@ spec:
         - ip: "192.168.23.110" #ip lb
           hostnames:
             - "oauth-meeting.co"
+            - "api-meeting.co"
       containers:
         - name: backend
           image: gk123a/backend:v3 # Image backend của bạn
