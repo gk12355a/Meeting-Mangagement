@@ -96,3 +96,6 @@ logging:
   level:
     org.springframework.security: TRACE
     org.springframework.security.oauth2: TRACE
+  pattern:
+    # %X{trace_id} và %X{span_id} là biến mà OTel Agent tự động inject vào
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [trace_id=%X{trace_id} span_id=%X{span_id}] - %msg%n"
