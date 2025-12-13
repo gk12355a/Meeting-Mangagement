@@ -24,7 +24,7 @@ spec:
 
       containers:
         - name: backend
-          image: gk123a/backend:v4
+          image: gk123a/backend:v5
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
