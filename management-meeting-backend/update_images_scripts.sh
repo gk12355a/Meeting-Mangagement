@@ -42,8 +42,8 @@ fi
 
 # 5. Kiểm tra kết quả
 if [ $? -eq 0 ]; then
-  echo "✅ Success: Image updated to [${NEW_FULL_IMAGE}]"
+  echo " Success: Image updated to [${NEW_FULL_IMAGE}]"
 else
-  echo "❌ Error: Failed to update image tag."
+  echo " Error: Failed to update image tag."
   exit 1
 fi

@@ -46,18 +46,6 @@ pipeline {
             }
         }
 
-        // [TÙY CHỌN] Nếu Dockerfile của bạn không phải multi-stage (không có bước build maven), 
-        // bạn cần bỏ comment đoạn dưới để build file .jar trước.
-        /*
-        stage('Build Maven') {
-            steps {
-                dir("${PROJECT_ROOT}") {
-                    sh 'mvn clean package -DskipTests'
-                }
-            }
-        }
-        */
-
         stage('Build & Push Docker Image') {
             steps {
                 script {
