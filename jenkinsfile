@@ -6,6 +6,7 @@ pipeline {
         choice(name: 'TARGET_SERVICE', choices: ['meeting-management-backend'], description: 'Service Name')
     }
 
+
     environment {
         // --- CẤU HÌNH DOCKER ---
         DOCKER_REGISTRY_USER = "gk123a"
