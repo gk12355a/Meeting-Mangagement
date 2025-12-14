@@ -24,7 +24,7 @@ spec:
 
       containers:
         - name: backend
-          image: gk123a/meeting-management-backend:v5
+          image: gk123a/meeting-management-backend:v1.0.0-prod
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
