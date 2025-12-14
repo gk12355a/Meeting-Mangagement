@@ -86,7 +86,6 @@ pipeline {
         stage('GitOps: Commit & Push') {
             environment {
                 TARGET_BRANCH = "${BRANCH}"
-                // Đường dẫn file để git add (tính từ root workspace)
                 TARGET_YAML_DIR = "${YAML_DIR}"
                 NEW_TAG = "${params.BUILD_TAG}"
             }
@@ -106,15 +105,20 @@ pipeline {
                         git config user.email "jenkins@ci.com"
 
                         echo "--- 2. Staging Files ---"
-                        # Add các file yaml trong thư mục con
+                        # Chỉ add các file YAML
                         git add $TARGET_YAML_DIR/*.yaml
 
                         echo "--- 3. Committing ---"
-                        if ! git diff-index --quiet HEAD; then
+                        # Sử dụng git diff --cached --quiet
+                        # Lệnh này chỉ kiểm tra sự thay đổi trong các file ĐÃ ADD (Staging Area)
+                        # Nếu file YAML không đổi -> trả về True (Quiet) -> Nhảy xuống else
+                        # Nếu file YAML có đổi -> trả về False -> Nhảy vào then để commit
+                        
+                        if ! git diff --cached --quiet; then
                             git commit -m "GitOps: Update Backend image to $NEW_TAG [ci skip]"
                             echo "Changes committed successfully."
                         else
-                            echo "No changes to commit."
+                            echo "No changes in manifest to commit. Skipping..."
                         fi
 
                         echo "--- 4. Cleaning Workspace ---"
@@ -125,6 +129,7 @@ pipeline {
                         git pull origin $TARGET_BRANCH --rebase
 
                         echo "--- 6. Pushing ---"
+                        # Chỉ push khi có commit mới (nhưng chạy lệnh push thừa cũng không sao, git sẽ báo Everything up-to-date)
                         git push https://$GIT_USER:$GIT_PASS@$GIT_REPO_RAW_URL $TARGET_BRANCH
                     '''
                 }
