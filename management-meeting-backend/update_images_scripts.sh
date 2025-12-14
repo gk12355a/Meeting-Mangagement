@@ -1,49 +1,44 @@
 #!/bin/bash
 
-# 1. Nhận các tham số truyền vào từ Jenkins
-# Thứ tự: $1=TênService, $2=VersionTag, $3=MôiTrường(dev/prod), $4=ThưMụcChứaYAML
+# 1. Nhận các tham số từ Jenkins
+# Thứ tự: $1=TênService, $2=VersionTag, $3=MôiTrường, $4=ThưMụcYAML
 SERVICE_NAME=$1
 VERSION=$2
 ENV_NAME=$3
 YAML_DIR=$4
 
-# 2. Cấu hình Docker Hub User (phải khớp với Jenkinsfile)
+# 2. Cấu hình Docker Hub User
 DOCKER_USER="gk123a"
 
 # 3. Tạo chuỗi Image Tag mới
-# Ví dụ kết quả: v1.0.0-dev
 NEW_TAG="${VERSION}-${ENV_NAME}"
-
-# Tạo chuỗi Image đầy đủ để thay thế vào file YAML
-# Ví dụ: gk123a/meeting-management-backend:v1.0.0-dev
 NEW_FULL_IMAGE="${DOCKER_USER}/${SERVICE_NAME}:${NEW_TAG}"
 
 echo "-------------------------------------------------"
-echo "Script: Update Image in Kubernetes Manifest"
-echo "Target File Path: $YAML_DIR/*.yaml"
+echo "Script: Update Image in Kubernetes Manifest (Linux)"
 echo "Service Name    : $SERVICE_NAME"
-echo "New Image Tag   : $NEW_FULL_IMAGE"
+echo "New Image       : $NEW_FULL_IMAGE"
+echo "Target Dir      : $YAML_DIR"
 echo "-------------------------------------------------"
 
-# 4. Thực hiện thay thế bằng lệnh sed
-# Giải thích lệnh sed:
-# -i : chỉnh sửa trực tiếp trên file (in-place)
-# s|...|...|g : thay thế nội dung (dùng dấu | làm phân cách để tránh lỗi với dấu / trong tên ảnh)
-# Regex: tìm dòng bắt đầu bằng 'image:', có chứa tên service, và thay thế toàn bộ phần sau 'image:'
+# [DEBUG] In ra dòng image hiện tại để kiểm tra xem script có tìm thấy file không
+echo "--- Current Image in YAML ---"
+grep "image:" ${YAML_DIR}/*.yaml
 
-# Kiểm tra hệ điều hành để chạy lệnh sed phù hợp
-if [[ "$OSTYPE" == "darwin"* ]]; then
-  # Dành cho macOS (nếu bạn chạy test local)
-  sed -i '' "s|image: .*/${SERVICE_NAME}:.*|image: ${NEW_FULL_IMAGE}|g" ${YAML_DIR}/*.yaml
-else
-  # Dành cho Linux (Môi trường Jenkins)
-  sed -i "s|image: .*/${SERVICE_NAME}:.*|image: ${NEW_FULL_IMAGE}|g" ${YAML_DIR}/*.yaml
-fi
+# 4. Thực hiện thay thế bằng lệnh sed (Cú pháp chuẩn Linux)
+# Lưu ý: Regex này tìm dòng chứa "image:" và tên Service
+# Nếu YAML của bạn đang để tên cũ là "backend" thay vì "meeting-management-backend"
+# thì lệnh này sẽ KHÔNG thay thế gì cả. Bạn cần sửa YAML cho khớp tên service.
+sed -i "s|image: .*/${SERVICE_NAME}:.*|image: ${NEW_FULL_IMAGE}|g" ${YAML_DIR}/*.yaml
 
-# 5. Kiểm tra kết quả
+# [DEBUG] In ra kết quả sau khi sed để xác nhận đã thay đổi
+echo "--- Updated Image in YAML ---"
+grep "image:" ${YAML_DIR}/*.yaml
+
+# 5. Kiểm tra mã lỗi
 if [ $? -eq 0 ]; then
-  echo " Success: Image updated to [${NEW_FULL_IMAGE}]"
+  echo "✅ Success: Command executed."
 else
-  echo " Error: Failed to update image tag."
+  echo "❌ Error: Failed to update image tag."
   exit 1
 fi
