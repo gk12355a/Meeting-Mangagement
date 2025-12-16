@@ -37,7 +37,7 @@ public class RoomController {
      * Cho phép tất cả user đã đăng nhập
      */
     @GetMapping
-    @Operation(summary = "Lấy danh sách tất cả phòng họp")
+    @Operation(summary = "Lấy danh sách tất cả phòng họp (Cho tất cả user)")
     @PreAuthorize("isAuthenticated()") // Chỉ cần đăng nhập là được
     public ResponseEntity<List<RoomDTO>> getAllRooms() {
         List<RoomDTO> rooms = roomService.getAllRooms();
