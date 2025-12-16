@@ -20,7 +20,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/rooms")
-@Tag(name = "Room API", description = "API Quản lý phòng họp (Admin) và Tra cứu (User)")
+@Tag(name = "Room API", description = "API Quản lý phòng họp và Tra cứu")
 @SecurityRequirement(name = "bearerAuth") // Báo Swagger API này cần token
 public class RoomController {
 
