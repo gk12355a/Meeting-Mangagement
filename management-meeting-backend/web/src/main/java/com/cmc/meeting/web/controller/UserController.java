@@ -32,7 +32,7 @@ public class UserController {
         return ResponseEntity.ok(users);
     }
     @GetMapping("/profile")
-    @Operation(summary = "Lấy thông tin cá nhân của người dùng đang đăng nhập")
+    @Operation(summary = "Lấy thông tin cá nhân của người ")
     public ResponseEntity<UserDTO> getMyProfile() {
         // Lấy username từ SecurityContext (đã được set bởi Filter/Converter)
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
