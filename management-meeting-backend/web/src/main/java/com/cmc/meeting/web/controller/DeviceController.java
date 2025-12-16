@@ -65,7 +65,7 @@ public class DeviceController {
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Xóa  ")
+    @Operation(summary = "Xóa một thiết bị ")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> deleteDevice(@PathVariable Long id) {
         deviceService.deleteDevice(id);
