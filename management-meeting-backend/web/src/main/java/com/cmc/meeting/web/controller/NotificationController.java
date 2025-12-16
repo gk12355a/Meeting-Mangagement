@@ -43,7 +43,7 @@ public class NotificationController {
             throw new RuntimeException("Unknown Principal");
         }
         return userRepository.findByUsername(username)
-                .orElseThrow(() -> new EntityNotFoundException("User not")).getId();
+                .orElseThrow(() -> new EntityNotFoundException("User not found")).getId();
     }
 
     @GetMapping
