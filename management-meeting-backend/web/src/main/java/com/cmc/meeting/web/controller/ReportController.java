@@ -27,7 +27,7 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 @RestController
 @RequestMapping("/api/v1/reports")
-@Tag(name = "Report API", description = "API Thống kê & Báo cáo (Chỉ Admin)")
+@Tag(name = "Report API", description = "API Thống kê & Báo cáo")
 @SecurityRequirement(name = "bearerAuth")
 @PreAuthorize("hasRole('ADMIN')") // <-- KHÓA TOÀN BỘ CONTROLLER
 public class ReportController {
