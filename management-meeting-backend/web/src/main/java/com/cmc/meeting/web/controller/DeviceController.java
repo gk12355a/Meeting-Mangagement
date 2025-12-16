@@ -48,7 +48,7 @@ public class DeviceController {
     }
 
     @PostMapping
-    @Operation(summary = "Tạo thiết bị mới (Admin)")
+    @Operation(summary = "")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<DeviceDTO> createDevice(@Valid @RequestBody DeviceRequest request) {
         DeviceDTO createdDevice = deviceService.createDevice(request);
