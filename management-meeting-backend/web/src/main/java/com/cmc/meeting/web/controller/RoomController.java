@@ -49,7 +49,7 @@ public class RoomController {
      * Chỉ Admin
      */
     @PostMapping
-    @Operation(summary = "Tạo phòng")
+    @Operation(summary = "Tạo phòng họp mới ")
     @PreAuthorize("hasRole('ADMIN')") // <-- CHỈ ADMIN MỚI ĐƯỢC GỌI
     public ResponseEntity<RoomDTO> createRoom(@Valid @RequestBody RoomRequest request) {
         RoomDTO createdRoom = roomService.createRoom(request);
