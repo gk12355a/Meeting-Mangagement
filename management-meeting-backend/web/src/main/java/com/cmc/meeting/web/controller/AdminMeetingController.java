@@ -46,7 +46,7 @@ public class AdminMeetingController {
     }
 
     @PutMapping("/{id}/approval")
-    @Operation(summary = "Phê duyệt hoặc Từ chối cuộc họp")
+    @Operation(summary = "Phê duyệt (Approve) hoặc Từ chối cuộc họp")
     public ResponseEntity<?> approveMeeting(
             @PathVariable Long id,
             @RequestBody ApprovalRequest request,
