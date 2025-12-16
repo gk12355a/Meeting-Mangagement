@@ -57,6 +57,6 @@ public class AdminMeetingController {
         meetingService.processMeetingApproval(id, request.isApproved(), request.getReason(), adminId);
         
         String action = request.isApproved() ? "phê duyệt" : "từ chối";
-        return ResponseEntity.ok("Đã " + action + " cuộc họp thành công.");
+        return ResponseEntity.ok("Đã " + action + " .");
     }
 }
