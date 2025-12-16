@@ -104,7 +104,7 @@ public class ReportController {
     }
     // BỔ SUNG: (BS-31)
     @GetMapping("/visitors")
-    @Operation(summary = "Báo cáo danh sách khách mời trong ngày (cho Lễ tân)")
+    @Operation(summary = "Báo cáo danh sách khách mời trong ngày")
     public ResponseEntity<List<VisitorReportDTO>> getVisitorReport(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
 
