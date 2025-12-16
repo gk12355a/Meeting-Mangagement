@@ -74,7 +74,7 @@ public class ReportController {
     }
     // BỔ SUNG: (US-23)
     @GetMapping("/cancelation-stats")
-    @Operation(summary = "Thống kê lý do hủy họp (US-23).")
+    @Operation(summary = "Thống kê lý do hủy họp (US-23). Thêm ?format=excel để tải về.")
     public ResponseEntity<?> getCancelationStats(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
