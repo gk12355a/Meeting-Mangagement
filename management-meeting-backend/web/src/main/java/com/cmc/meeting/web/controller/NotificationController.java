@@ -73,6 +73,6 @@ public class NotificationController {
     public ResponseEntity<?> markAllAsRead(@AuthenticationPrincipal Object principal) {
         Long currentUserId = getUserId(principal);
         notificationService.markAllAsRead(currentUserId);
-        return ResponseEntity.ok("Đã đánh dấu tất cả là đã đọc.");
+        return ResponseEntity.ok(".");
     }
 }
