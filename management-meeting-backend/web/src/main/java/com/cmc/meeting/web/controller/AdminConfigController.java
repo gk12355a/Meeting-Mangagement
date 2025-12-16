@@ -33,7 +33,7 @@ public class AdminConfigController {
     }
 
     @PutMapping("/{key}")
-    @Operation(summary = "Cập nhật một tham số (vd: )")
+    @Operation(summary = "Cập nhật một tham số (vd: template email, )")
     public ResponseEntity<AppConfig> updateConfig(
             @PathVariable String key,
             @Valid @RequestBody AppConfigUpdateRequest request) {
