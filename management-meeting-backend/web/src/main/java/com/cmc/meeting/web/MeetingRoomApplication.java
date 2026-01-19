@@ -1,7 +1,7 @@
 package com.cmc.meeting.web;
 
+import io.github.cdimascio.dotenv.Dotenv;
 import org.mybatis.spring.annotation.MapperScan; // <-- 1. Import mới
-import org.springframework.amqp.rabbit.annotation.EnableRabbit;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.domain.EntityScan; // <-- 2. Import mới
@@ -26,13 +26,19 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 // 4. (Bonus) Chỉ cho Spring nơi tìm MyBatis Mappers (để hết lỗi WARN)
 @MapperScan(basePackages = "com.cmc.meeting.infrastructure.persistence.mybatis.mapper")
-@EnableRabbit
+
 @EnableAsync
 @EnableScheduling
 @EnableCaching
 public class MeetingRoomApplication {
 
     public static void main(String[] args) {
+        
+        Dotenv dotenv = Dotenv.load();
+        dotenv.entries().forEach(entry -> {
+            System.setProperty(entry.getKey(), entry.getValue());
+        });
+
         SpringApplication.run(MeetingRoomApplication.class, args);
     }
 }

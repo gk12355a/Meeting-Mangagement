@@ -69,6 +69,8 @@ public class MeetingController {
             throw new RuntimeException("Loại xác thực không hỗ trợ: " + principal.getClass());
         }
 
+        System.out.println("DEBUG: Username from Token: " + username);
+
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new EntityNotFoundException("User không tồn tại: " + username));
         return user.getId();
