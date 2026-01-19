@@ -18,9 +18,8 @@ import java.util.Set;
 public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity, Long> {
 
         // (US-6) Lấy lịch họp của tôi (phân trang)
-        @Query("SELECT m FROM MeetingEntity m " +
+        @Query("SELECT DISTINCT m FROM MeetingEntity m " +
                         "LEFT JOIN m.participants p " +
-                        // Giả sử EmbeddableParticipant của bạn có trường 'userId'
                         "WHERE m.organizer.id = :userId OR p.userId = :userId " +
                         "ORDER BY m.startTime DESC")
         Page<MeetingEntity> findMyMeetings(@Param("userId") Long userId, Pageable pageable);
