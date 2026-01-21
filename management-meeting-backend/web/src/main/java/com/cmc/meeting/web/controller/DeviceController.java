@@ -29,6 +29,7 @@ public class DeviceController {
 
     private final DeviceService deviceService;
     private final MeetingService meetingService;
+
     public DeviceController(DeviceService deviceService, MeetingService meetingService) {
         this.deviceService = deviceService;
         this.meetingService = meetingService;
@@ -41,26 +42,29 @@ public class DeviceController {
     @GetMapping
     @Operation(summary = "Lấy danh sách tất cả thiết bị (Cho tất cả user)")
     // BỔ SUNG: Cho phép USER
-    @PreAuthorize("isAuthenticated()") 
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<DeviceDTO>> getAllDevices() {
         List<DeviceDTO> devices = deviceService.getAllDevices();
         return ResponseEntity.ok(devices);
     }
 
-    @PostMapping
+    @PostMapping(consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Tạo thiết bị mới (Admin)")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<DeviceDTO> createDevice(@Valid @RequestBody DeviceRequest request) {
-        DeviceDTO createdDevice = deviceService.createDevice(request);
+    public ResponseEntity<DeviceDTO> createDevice(
+            @RequestPart("request") @Valid DeviceRequest request,
+            @RequestPart(value = "images", required = false) List<org.springframework.web.multipart.MultipartFile> images) {
+        DeviceDTO createdDevice = deviceService.createDevice(request, images);
         return new ResponseEntity<>(createdDevice, HttpStatus.CREATED);
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Cập nhật thông tin thiết bị (Admin)")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<DeviceDTO> updateDevice(@PathVariable Long id,
-                                                @Valid @RequestBody DeviceRequest request) {
-        DeviceDTO updatedDevice = deviceService.updateDevice(id, request);
+            @RequestPart("request") @Valid DeviceRequest request,
+            @RequestPart(value = "images", required = false) List<org.springframework.web.multipart.MultipartFile> images) {
+        DeviceDTO updatedDevice = deviceService.updateDevice(id, request, images);
         return ResponseEntity.ok(updatedDevice);
     }
 
@@ -76,10 +80,11 @@ public class DeviceController {
     public ResponseEntity<List<DeviceDTO>> getAvailableDevices(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
-        
+
         List<DeviceDTO> availableDevices = deviceService.findAvailableDevices(startTime, endTime);
         return ResponseEntity.ok(availableDevices);
     }
+
     @GetMapping("/{id}/meetings")
     @Operation(summary = "Lấy lịch sử dụng (lịch bận) của một thiết bị")
     @PreAuthorize("hasRole('USER')")
@@ -87,7 +92,7 @@ public class DeviceController {
             @PathVariable Long id,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
-        
+
         List<BookedSlotDTO> schedule = meetingService.getDeviceSchedule(id, startTime, endTime);
         return ResponseEntity.ok(schedule);
     }
