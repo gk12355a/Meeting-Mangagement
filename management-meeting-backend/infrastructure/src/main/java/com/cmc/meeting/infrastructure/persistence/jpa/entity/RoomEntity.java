@@ -34,4 +34,9 @@ public class RoomEntity {
 
     @Column(name = "requires_approval", nullable = false)
     private boolean requiresApproval = false;
+
+    @ElementCollection
+    @CollectionTable(name = "room_images", joinColumns = @JoinColumn(name = "room_id"))
+    @Column(name = "image_url")
+    private List<String> images;
 }

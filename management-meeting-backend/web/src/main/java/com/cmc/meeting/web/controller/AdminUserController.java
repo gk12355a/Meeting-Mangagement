@@ -39,23 +39,24 @@ public class AdminUserController {
         return ResponseEntity.ok(adminUserService.getAllUsers());
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<AdminUserDTO> updateUser(
             @PathVariable Long id,
-            @Valid @RequestBody AdminUserUpdateRequest request) {
-        return ResponseEntity.ok(adminUserService.updateUser(id, request));
+            @RequestPart("request") @Valid AdminUserUpdateRequest request,
+            @RequestPart(value = "avatar", required = false) org.springframework.web.multipart.MultipartFile avatar) {
+        return ResponseEntity.ok(adminUserService.updateUser(id, request, avatar));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteUser(
             @PathVariable Long id,
             @AuthenticationPrincipal Object principal) {
-        
+
         Long currentAdminId = getUserId(principal);
         adminUserService.deleteUser(id, currentAdminId);
         return ResponseEntity.ok("Đã vô hiệu hóa user.");
     }
-    
+
     private Long getUserId(Object principal) {
         String username;
         if (principal instanceof UserDetails) {
@@ -71,10 +72,11 @@ public class AdminUserController {
         return user.getId();
     }
 
-    @PostMapping
+    @PostMapping(consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<AdminUserDTO> createUser(
-            @Valid @RequestBody AdminUserCreationRequest request) {
-        AdminUserDTO newUser = adminUserService.createUser(request);
+            @RequestPart("request") @Valid AdminUserCreationRequest request,
+            @RequestPart(value = "avatar", required = false) org.springframework.web.multipart.MultipartFile avatar) {
+        AdminUserDTO newUser = adminUserService.createUser(request, avatar);
         return ResponseEntity.status(HttpStatus.CREATED).body(newUser);
     }
 }

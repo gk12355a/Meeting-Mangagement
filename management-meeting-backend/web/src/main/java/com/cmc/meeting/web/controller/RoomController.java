@@ -48,11 +48,13 @@ public class RoomController {
      * API Tạo phòng họp mới (US-11)
      * Chỉ Admin
      */
-    @PostMapping
+    @PostMapping(consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Tạo phòng họp mới (Chỉ Admin)")
     @PreAuthorize("hasRole('ADMIN')") // <-- CHỈ ADMIN MỚI ĐƯỢC GỌI
-    public ResponseEntity<RoomDTO> createRoom(@Valid @RequestBody RoomRequest request) {
-        RoomDTO createdRoom = roomService.createRoom(request);
+    public ResponseEntity<RoomDTO> createRoom(
+            @RequestPart("request") @Valid RoomRequest request,
+            @RequestPart(value = "images", required = false) List<org.springframework.web.multipart.MultipartFile> images) {
+        RoomDTO createdRoom = roomService.createRoom(request, images);
         return new ResponseEntity<>(createdRoom, HttpStatus.CREATED);
     }
 
@@ -60,12 +62,13 @@ public class RoomController {
      * API Cập nhật phòng họp (US-11)
      * Chỉ Admin
      */
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Cập nhật thông tin phòng họp (Chỉ Admin)")
     @PreAuthorize("hasRole('ADMIN')") // <-- CHỈ ADMIN MỚI ĐƯỢC GỌI
-    public ResponseEntity<RoomDTO> updateRoom(@PathVariable Long id, 
-                                            @Valid @RequestBody RoomRequest request) {
-        RoomDTO updatedRoom = roomService.updateRoom(id, request);
+    public ResponseEntity<RoomDTO> updateRoom(@PathVariable Long id,
+            @RequestPart("request") @Valid RoomRequest request,
+            @RequestPart(value = "images", required = false) List<org.springframework.web.multipart.MultipartFile> images) {
+        RoomDTO updatedRoom = roomService.updateRoom(id, request, images);
         return ResponseEntity.ok(updatedRoom);
     }
 
@@ -80,6 +83,7 @@ public class RoomController {
         roomService.deleteRoom(id);
         return ResponseEntity.ok("Đã xóa phòng họp thành công.");
     }
+
     /**
      * API Gợi ý phòng họp (US-26)
      * Lấy danh sách phòng trống theo thời gian và sức chứa
@@ -102,7 +106,7 @@ public class RoomController {
             @PathVariable Long id,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
-        
+
         // Dòng này sẽ hết lỗi vì 'meetingService' đã được tiêm (inject)
         List<BookedSlotDTO> schedule = meetingService.getRoomSchedule(id, startTime, endTime);
         return ResponseEntity.ok(schedule);

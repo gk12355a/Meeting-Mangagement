@@ -4,8 +4,12 @@ import com.cmc.meeting.application.dto.request.UserProfileUpdateRequest;
 import com.cmc.meeting.application.dto.response.UserDTO;
 import java.util.List;
 
+import org.springframework.web.multipart.MultipartFile;
+
 public interface UserService {
     List<UserDTO> searchUsers(String query);
-    UserDTO updateUserProfile(String username, UserProfileUpdateRequest request);
+
+    UserDTO updateUserProfile(String username, UserProfileUpdateRequest request, MultipartFile avatar);
+
     UserDTO getUserProfile(String username);
 }
