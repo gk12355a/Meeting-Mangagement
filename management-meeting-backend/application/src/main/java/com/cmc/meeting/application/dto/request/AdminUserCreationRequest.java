@@ -10,7 +10,6 @@ import java.util.Set;
 
 /**
  * DTO cho Admin tạo người dùng mới.
- * Mật khẩu sẽ được hệ thống tự động tạo và gửi qua email.
  */
 @Data
 @NoArgsConstructor
@@ -22,6 +21,10 @@ public class AdminUserCreationRequest {
     @NotBlank(message = "Email (username) không được để trống")
     @Email(message = "Email không hợp lệ")
     private String username; // Đây là email
+
+
+    @NotBlank(message = "Mật khẩu không được để trống")
+    private String password;
 
     @NotEmpty(message = "Phải chọn ít nhất một vai trò (role)")
     private Set<Role> roles;

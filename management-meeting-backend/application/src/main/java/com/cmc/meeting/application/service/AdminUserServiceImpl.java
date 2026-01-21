@@ -161,8 +161,8 @@ public class AdminUserServiceImpl implements AdminUserService {
             throw new PolicyViolationException("Email (username) này đã được sử dụng.");
         }
 
-        // 2. Tạo mật khẩu ngẫu nhiên (ví dụ: 10 ký tự)
-        String rawPassword = UUID.randomUUID().toString().substring(0, 10);
+        // 2. Lấy mật khẩu từ request
+        String rawPassword = request.getPassword();
 
         // 3. Tạo đối tượng User
         User newUser = new User();
