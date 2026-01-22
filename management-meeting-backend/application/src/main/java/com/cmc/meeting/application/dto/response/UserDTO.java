@@ -8,7 +8,8 @@ public class UserDTO {
     private Long id;
     private String fullName;
     private String username;
-    
+
     // [BỔ SUNG] Thêm trường roles để Frontend điều hướng
-    private Set<String> roles; 
+    private Set<String> roles;
+    private String avatarUrl;
 }

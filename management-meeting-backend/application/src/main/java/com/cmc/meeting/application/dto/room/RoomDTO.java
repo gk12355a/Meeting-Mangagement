@@ -6,6 +6,7 @@ import com.cmc.meeting.domain.model.Role; // Bổ sung
 import com.cmc.meeting.domain.model.RoomStatus;
 
 import java.util.Set; // Bổ sung
+
 @Data
 public class RoomDTO {
     private Long id;
@@ -16,4 +17,5 @@ public class RoomDTO {
     private Set<Role> requiredRoles;
     private RoomStatus status;
     private boolean requiresApproval;
+    private List<String> images;
 }

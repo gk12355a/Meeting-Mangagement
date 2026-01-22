@@ -8,4 +8,5 @@ public class Device {
     private String name;
     private String description;
     private DeviceStatus status = DeviceStatus.AVAILABLE;
+    private java.util.List<String> images;
 }

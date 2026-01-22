@@ -35,27 +35,31 @@ public class AdminUserServiceImpl implements AdminUserService {
     private final UserRepository userRepository;
     private final ModelMapper modelMapper;
     private final MeetingRepository meetingRepository;
-    
+
     // === TIÊM (INJECT) SERVICE MỚI ===
     private final MeetingService meetingService;
     private final PasswordEncoder passwordEncoder;
     private final ApplicationEventPublisher eventPublisher;
+    private final com.cmc.meeting.application.port.storage.FileStoragePort fileStoragePort; // <-- THÊM MỚI
 
     // === CẬP NHẬT CONSTRUCTOR ===
     public AdminUserServiceImpl(UserRepository userRepository,
             ModelMapper modelMapper,
             MeetingRepository meetingRepository,
             MeetingService meetingService,
-            PasswordEncoder passwordEncoder, // <-- THÊM MỚI
-            ApplicationEventPublisher eventPublisher // <-- THÊM MỚI
+            PasswordEncoder passwordEncoder,
+            ApplicationEventPublisher eventPublisher,
+            com.cmc.meeting.application.port.storage.FileStoragePort fileStoragePort // <-- THÊM MỚI
     ) {
         this.userRepository = userRepository;
         this.modelMapper = modelMapper;
         this.meetingRepository = meetingRepository;
         this.meetingService = meetingService;
-        this.passwordEncoder = passwordEncoder; // <-- THÊM MỚI
-        this.eventPublisher = eventPublisher; // <-- THÊM MỚI
+        this.passwordEncoder = passwordEncoder;
+        this.eventPublisher = eventPublisher;
+        this.fileStoragePort = fileStoragePort; // <-- THÊM MỚI
     }
+
     @Override
     @Transactional(readOnly = true)
     public List<AdminUserDTO> getAllUsers() {
@@ -67,13 +71,24 @@ public class AdminUserServiceImpl implements AdminUserService {
     }
 
     @Override
-    public AdminUserDTO updateUser(Long userId, AdminUserUpdateRequest request) {
+    public AdminUserDTO updateUser(Long userId, AdminUserUpdateRequest request,
+            org.springframework.web.multipart.MultipartFile avatar) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy user: " + userId));
 
         // Cập nhật quyền và trạng thái
         user.setRoles(request.getRoles());
         user.setActive(request.getIsActive());
+
+        // Xử lý avatar
+        if (avatar != null && !avatar.isEmpty()) {
+            try {
+                java.util.Map<String, String> result = fileStoragePort.uploadFile(avatar);
+                user.setAvatarUrl(result.get("url"));
+            } catch (java.io.IOException e) {
+                throw new RuntimeException("Upload failed: " + e.getMessage());
+            }
+        }
 
         User updatedUser = userRepository.save(user);
         return modelMapper.map(updatedUser, AdminUserDTO.class);
@@ -84,7 +99,7 @@ public class AdminUserServiceImpl implements AdminUserService {
      */
     @Override
     public void deleteUser(Long userIdToDelete, Long currentAdminId) {
-        
+
         // 1. Kiểm tra an toàn: Không thể tự xóa chính mình
         if (userIdToDelete.equals(currentAdminId)) {
             throw new PolicyViolationException("Admin không thể tự xóa chính mình.");
@@ -100,12 +115,13 @@ public class AdminUserServiceImpl implements AdminUserService {
         // 2. Kiểm tra an toàn: Không thể xóa Admin cuối cùng
         if (userToDelete.getRoles().contains(Role.ROLE_ADMIN)) {
             // (Giả sử bạn đã thêm hàm 'countAdmins' vào UserRepository)
-            // long adminCount = userRepository.countAdmins(); 
+            // long adminCount = userRepository.countAdmins();
             // if (adminCount <= 1) {
-            //     throw new PolicyViolationException("Không thể xóa Admin cuối cùng của hệ thống.");
+            // throw new PolicyViolationException("Không thể xóa Admin cuối cùng của hệ
+            // thống.");
             // }
             // (Tạm thời dùng logic cũ của bạn nếu chưa có hàm countAdmins)
-             long adminCount = userRepository.findAll().stream()
+            long adminCount = userRepository.findAll().stream()
                     .filter(user -> user.getRoles().contains(Role.ROLE_ADMIN) && user.isActive())
                     .count();
             if (adminCount <= 1) {
@@ -115,24 +131,22 @@ public class AdminUserServiceImpl implements AdminUserService {
 
         // 3. (LOGIC MỚI) TÌM VÀ HỦY CÁC CUỘC HỌP LIÊN QUAN
         log.info("Đang tìm các cuộc họp tương lai do User ID: {} tổ chức...", userIdToDelete);
-        
+
         List<Meeting> futureMeetings = meetingRepository
                 .findFutureMeetingsByOrganizerId(userIdToDelete, LocalDateTime.now());
 
         if (!futureMeetings.isEmpty()) {
-            log.warn("User ID: {} đang tổ chức {} cuộc họp. Sẽ tiến hành hủy...", 
-                     userIdToDelete, futureMeetings.size());
-        
-            
+            log.warn("User ID: {} đang tổ chức {} cuộc họp. Sẽ tiến hành hủy...",
+                    userIdToDelete, futureMeetings.size());
+
             // 1. Tạo DTO rỗng
             MeetingCancelRequest reason = new MeetingCancelRequest();
             // 2. Dùng hàm setter
             reason.setReason(
-                "Người tổ chức cuộc họp (" + userToDelete.getFullName() + ") đã bị vô hiệu hóa khỏi hệ thống."
-            );
-            
+                    "Người tổ chức cuộc họp (" + userToDelete.getFullName() + ") đã bị vô hiệu hóa khỏi hệ thống.");
+
             // ==========================================================
-            
+
             for (Meeting meeting : futureMeetings) {
                 try {
                     // Gọi MeetingService để hủy họp VÀ gửi thông báo
@@ -146,23 +160,25 @@ public class AdminUserServiceImpl implements AdminUserService {
         }
 
         // 4. (LOGIC MỚI) VÔ HIỆU HÓA USER (SOFT DELETE)
-        userToDelete.setActive(false); 
+        userToDelete.setActive(false);
         userToDelete.setUsername(userToDelete.getUsername() + "_disabled_" + System.currentTimeMillis());
-        
+
         userRepository.save(userToDelete);
-        
+
         log.info("Đã vô hiệu hóa (soft delete) User ID: {} thành công.", userIdToDelete);
     }
+
     @Override
-    public AdminUserDTO createUser(AdminUserCreationRequest request) {
-        
+    public AdminUserDTO createUser(AdminUserCreationRequest request,
+            org.springframework.web.multipart.MultipartFile avatar) {
+
         // 1. Kiểm tra username (email) đã tồn tại chưa
         if (userRepository.findByUsername(request.getUsername()).isPresent()) {
             throw new PolicyViolationException("Email (username) này đã được sử dụng.");
         }
 
-        // 2. Tạo mật khẩu ngẫu nhiên (ví dụ: 10 ký tự)
-        String rawPassword = UUID.randomUUID().toString().substring(0, 10);
+        // 2. Lấy mật khẩu từ request
+        String rawPassword = request.getPassword();
 
         // 3. Tạo đối tượng User
         User newUser = new User();
@@ -171,10 +187,20 @@ public class AdminUserServiceImpl implements AdminUserService {
         newUser.setRoles(request.getRoles());
         newUser.setActive(true); // Mặc định là active
 
+        // Xử lý avatar
+        if (avatar != null && !avatar.isEmpty()) {
+            try {
+                java.util.Map<String, String> result = fileStoragePort.uploadFile(avatar);
+                newUser.setAvatarUrl(result.get("url"));
+            } catch (java.io.IOException e) {
+                throw new RuntimeException("Upload failed: " + e.getMessage());
+            }
+        }
+
         // 4. Băm (Hash) mật khẩu và lưu
         newUser.setPassword(passwordEncoder.encode(rawPassword));
         User savedUser = userRepository.save(newUser);
-        
+
         log.info("Đã tạo User ID: {} với mật khẩu (đã băm).", savedUser.getId());
 
         // 5. KÍCH HOẠT SỰ KIỆN (Gửi kèm mật khẩu THÔ)
@@ -183,6 +209,5 @@ public class AdminUserServiceImpl implements AdminUserService {
 
         return modelMapper.map(savedUser, AdminUserDTO.class);
     }
-
 
 }

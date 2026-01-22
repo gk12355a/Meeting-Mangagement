@@ -22,10 +22,13 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final ModelMapper modelMapper;
+    private final com.cmc.meeting.application.port.storage.FileStoragePort fileStoragePort;
 
-    public UserServiceImpl(UserRepository userRepository, ModelMapper modelMapper) {
+    public UserServiceImpl(UserRepository userRepository, ModelMapper modelMapper,
+            com.cmc.meeting.application.port.storage.FileStoragePort fileStoragePort) {
         this.userRepository = userRepository;
         this.modelMapper = modelMapper;
+        this.fileStoragePort = fileStoragePort;
     }
 
     @Override
@@ -45,15 +48,16 @@ public class UserServiceImpl implements UserService {
     public UserDTO getUserProfile(String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + username));
-        
+
         // Map sang DTO và trả về (bao gồm cả Roles mới nhất từ DB)
         return convertToDTO(user);
     }
 
     @Override
     @Transactional // Write transaction
-    public UserDTO updateUserProfile(String username, UserProfileUpdateRequest request) {
-        
+    public UserDTO updateUserProfile(String username, UserProfileUpdateRequest request,
+            org.springframework.web.multipart.MultipartFile avatar) {
+
         // 1. Tìm người dùng
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy người dùng: " + username));
@@ -61,6 +65,19 @@ public class UserServiceImpl implements UserService {
         // 2. Cập nhật thông tin (chỉ cập nhật các trường được phép)
         if (request.getFullName() != null && !request.getFullName().isBlank()) {
             user.setFullName(request.getFullName());
+        }
+
+        // 3. Xử lý Avatar nếu có
+        if (avatar != null && !avatar.isEmpty()) {
+            try {
+                // Nếu User đó đã có avatar cũ, có thể cần xóa (tùy logic), ở đây ta chỉ ghi
+                // chép mới
+                java.util.Map<String, String> uploadResult = fileStoragePort.uploadFile(avatar);
+                String newAvatarUrl = uploadResult.get("url");
+                user.setAvatarUrl(newAvatarUrl);
+            } catch (java.io.IOException e) {
+                throw new RuntimeException("Lỗi khi upload ảnh đại diện: " + e.getMessage());
+            }
         }
 
         // 3. Lưu vào DB
@@ -79,7 +96,8 @@ public class UserServiceImpl implements UserService {
         UserDTO dto = modelMapper.map(user, UserDTO.class);
 
         // 2. [QUAN TRỌNG] Map thủ công trường Roles để đảm bảo chính xác tuyệt đối
-        // User.getRoles() trả về Set<Role> (Enum), còn UserDTO.getRoles() là Set<String>
+        // User.getRoles() trả về Set<Role> (Enum), còn UserDTO.getRoles() là
+        // Set<String>
         if (user.getRoles() != null) {
             Set<String> roleNames = user.getRoles().stream()
                     .map(Enum::name) // Chuyển Enum thành String (VD: "ROLE_ADMIN")

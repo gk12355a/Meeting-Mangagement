@@ -20,10 +20,13 @@ public class RoomServiceImpl implements RoomService {
 
     private final RoomRepository roomRepository;
     private final ModelMapper modelMapper;
+    private final com.cmc.meeting.application.port.storage.FileStoragePort fileStoragePort;
 
-    public RoomServiceImpl(RoomRepository roomRepository, ModelMapper modelMapper) {
+    public RoomServiceImpl(RoomRepository roomRepository, ModelMapper modelMapper,
+            com.cmc.meeting.application.port.storage.FileStoragePort fileStoragePort) {
         this.roomRepository = roomRepository;
         this.modelMapper = modelMapper;
+        this.fileStoragePort = fileStoragePort;
     }
 
     @Override
@@ -35,15 +38,32 @@ public class RoomServiceImpl implements RoomService {
     }
 
     @Override
-    public RoomDTO createRoom(RoomRequest request) {
+    public RoomDTO createRoom(RoomRequest request, List<org.springframework.web.multipart.MultipartFile> images) {
         Room newRoom = modelMapper.map(request, Room.class);
-        // newRoom.setStatus(request.getStatus()); // ModelMapper tự làm
+
+        // Xử lý upload ảnh
+        if (images != null && !images.isEmpty()) {
+            java.util.List<String> imageUrls = new java.util.ArrayList<>();
+            for (org.springframework.web.multipart.MultipartFile image : images) {
+                if (!image.isEmpty()) {
+                    try {
+                        java.util.Map<String, String> result = fileStoragePort.uploadFile(image);
+                        imageUrls.add(result.get("url"));
+                    } catch (java.io.IOException e) {
+                        throw new RuntimeException("Upload failed: " + e.getMessage());
+                    }
+                }
+            }
+            newRoom.setImages(imageUrls);
+        }
+
         Room savedRoom = roomRepository.save(newRoom);
         return modelMapper.map(savedRoom, RoomDTO.class);
     }
 
     @Override
-    public RoomDTO updateRoom(Long id, RoomRequest request) {
+    public RoomDTO updateRoom(Long id, RoomRequest request,
+            List<org.springframework.web.multipart.MultipartFile> images) {
         Room existingRoom = roomRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy phòng: " + id));
 
@@ -57,6 +77,27 @@ public class RoomServiceImpl implements RoomService {
         if (request.getRequiresApproval() != null) {
             existingRoom.setRequiresApproval(request.getRequiresApproval());
         }
+
+        // Xử lý upload ảnh (cộng dồn hoặc thay thế? Tạm thời là cộng dồn hoặc nếu muốn
+        // thay thế thì clear cũ đi)
+        // Logic ở đây: Nếu có gửi ảnh mới lên, thì thêm vào danh sách hiện có.
+        // (Nếu muốn xóa ảnh cũ, cần API riêng hoặc logic phức tạp hơn)
+        if (images != null && !images.isEmpty()) {
+            if (existingRoom.getImages() == null) {
+                existingRoom.setImages(new java.util.ArrayList<>());
+            }
+            for (org.springframework.web.multipart.MultipartFile image : images) {
+                if (!image.isEmpty()) {
+                    try {
+                        java.util.Map<String, String> result = fileStoragePort.uploadFile(image);
+                        existingRoom.getImages().add(result.get("url"));
+                    } catch (java.io.IOException e) {
+                        throw new RuntimeException("Upload failed: " + e.getMessage());
+                    }
+                }
+            }
+        }
+
         Room updatedRoom = roomRepository.save(existingRoom);
         return modelMapper.map(updatedRoom, RoomDTO.class);
     }

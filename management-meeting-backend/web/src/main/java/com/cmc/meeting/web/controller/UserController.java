@@ -31,6 +31,7 @@ public class UserController {
         List<UserDTO> users = userService.searchUsers(query);
         return ResponseEntity.ok(users);
     }
+
     @GetMapping("/profile")
     @Operation(summary = "Lấy thông tin cá nhân của người dùng đang đăng nhập")
     public ResponseEntity<UserDTO> getMyProfile() {
@@ -42,12 +43,13 @@ public class UserController {
         return ResponseEntity.ok(userDTO);
     }
 
-    @PutMapping("/profile")
+    @PutMapping(value = "/profile", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<UserDTO> updateUserProfile(
-            @RequestBody UserProfileUpdateRequest request,
+            @RequestPart("request") UserProfileUpdateRequest request,
+            @RequestPart(value = "avatar", required = false) org.springframework.web.multipart.MultipartFile avatar,
             @AuthenticationPrincipal Object principal) { // Dùng Object
-        
+
         String currentUsername;
         if (principal instanceof UserDetails) {
             currentUsername = ((UserDetails) principal).getUsername();
@@ -56,8 +58,8 @@ public class UserController {
         } else {
             throw new RuntimeException("Auth type not supported");
         }
-        
-        UserDTO updatedUser = userService.updateUserProfile(currentUsername, request);
+
+        UserDTO updatedUser = userService.updateUserProfile(currentUsername, request, avatar);
         return ResponseEntity.ok(updatedUser);
     }
 }

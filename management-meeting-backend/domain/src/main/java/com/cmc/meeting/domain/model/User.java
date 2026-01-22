@@ -21,4 +21,5 @@ public class User {
     private String googleRefreshToken;
     private boolean isGoogleLinked = false;
     private Long authServiceId;
+    private String avatarUrl;
 }

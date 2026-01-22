@@ -10,4 +10,5 @@ public class DeviceDTO {
     private String name;
     private String description;
     private DeviceStatus status;
+    private java.util.List<String> images;
 }

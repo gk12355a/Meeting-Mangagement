@@ -11,4 +11,5 @@ public class AdminUserDTO {
     private String fullName;
     private Set<Role> roles;
     private boolean isActive;
+    private String avatarUrl;
 }

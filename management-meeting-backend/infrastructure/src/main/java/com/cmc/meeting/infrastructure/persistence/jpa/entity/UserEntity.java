@@ -25,24 +25,27 @@ public class UserEntity {
 
     @Column(nullable = false)
     private String fullName;
-    
-    // Lưu ý: Password chỉ cần thiết cho User local, có thể cho phép NULL nếu dùng SSO hoàn toàn
+
+    // Lưu ý: Password chỉ cần thiết cho User local, có thể cho phép NULL nếu dùng
+    // SSO hoàn toàn
     @Column(nullable = false)
     private String password;
-    
+
     @ElementCollection(fetch = FetchType.EAGER) // Tải quyền ngay lập tức
     @CollectionTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "role_name", nullable = false)
     @Enumerated(EnumType.STRING) // Lưu tên (vd: "ROLE_ADMIN")
     private Set<Role> roles = new HashSet<>();
-    
+
     @Column(nullable = false, columnDefinition = "BIT(1) DEFAULT 1")
     private boolean isActive = true;
-    
+
     @Column(name = "google_refresh_token", columnDefinition = "TEXT")
-    private String googleRefreshToken; 
+    private String googleRefreshToken;
 
     @Column(name = "is_google_linked")
     private boolean isGoogleLinked = false;
 
+    @Column(name = "avatar_url")
+    private String avatarUrl;
 }

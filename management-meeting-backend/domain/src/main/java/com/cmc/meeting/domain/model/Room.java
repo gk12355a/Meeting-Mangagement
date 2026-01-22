@@ -20,4 +20,5 @@ public class Room {
     private Set<Role> requiredRoles = new HashSet<>();
     private RoomStatus status = RoomStatus.AVAILABLE;
     private boolean requiresApproval = false;
+    private List<String> images;
 }
