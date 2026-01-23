@@ -16,6 +16,11 @@ spring:
   application:
     name: management-meeting-backend
 
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
   # === 1. Cấu hình CSDL (Đọc từ .env) ===
   datasource:
     url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?createDatabaseIfNotExist=true

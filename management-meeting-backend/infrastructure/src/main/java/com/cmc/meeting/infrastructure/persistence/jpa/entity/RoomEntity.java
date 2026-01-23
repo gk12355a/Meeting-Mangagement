@@ -19,7 +19,15 @@ public class RoomEntity {
     private String name;
 
     private int capacity;
+
+    // Giữ lại để reference, nhưng dữ liệu chính sẽ là buildingName + floor
     private String location;
+
+    @Column(name = "building_name")
+    private String buildingName;
+
+    @Column(name = "floor")
+    private Integer floor;
 
     // Lưu danh sách thiết bị cố định (BS-14.2)
     @ElementCollection

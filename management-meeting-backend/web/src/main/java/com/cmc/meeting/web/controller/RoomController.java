@@ -58,6 +58,14 @@ public class RoomController {
         return new ResponseEntity<>(createdRoom, HttpStatus.CREATED);
     }
 
+    @PostMapping(consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Tạo phòng họp mới (JSON, không ảnh)")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<RoomDTO> createRoomJson(@RequestBody @Valid RoomRequest request) {
+        RoomDTO createdRoom = roomService.createRoom(request, null);
+        return new ResponseEntity<>(createdRoom, HttpStatus.CREATED);
+    }
+
     /**
      * API Cập nhật phòng họp (US-11)
      * Chỉ Admin
@@ -69,6 +77,15 @@ public class RoomController {
             @RequestPart("request") @Valid RoomRequest request,
             @RequestPart(value = "images", required = false) List<org.springframework.web.multipart.MultipartFile> images) {
         RoomDTO updatedRoom = roomService.updateRoom(id, request, images);
+        return ResponseEntity.ok(updatedRoom);
+    }
+
+    @PutMapping(value = "/{id}", consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Cập nhật thông tin phòng họp (JSON, không ảnh hoặc xóa ảnh)")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<RoomDTO> updateRoomJson(@PathVariable Long id,
+            @RequestBody @Valid RoomRequest request) {
+        RoomDTO updatedRoom = roomService.updateRoom(id, request, null);
         return ResponseEntity.ok(updatedRoom);
     }
 

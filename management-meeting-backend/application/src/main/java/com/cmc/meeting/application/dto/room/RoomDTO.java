@@ -13,6 +13,8 @@ public class RoomDTO {
     private String name;
     private int capacity;
     private String location;
+    private String buildingName;
+    private Integer floor;
     private List<String> fixedDevices;
     private Set<Role> requiredRoles;
     private RoomStatus status;
