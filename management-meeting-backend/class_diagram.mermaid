@@ -1,0 +1,209 @@
+classDiagram
+    direction TB
+
+    %% =========================================================
+    %% MERGED DOMAIN & SERVICE CLASSES
+    %% =========================================================
+    
+    class User {
+        %% Attributes
+        +Long id
+        +String username
+        +String fullName
+        +String password
+        +Set~Role~ roles
+        +boolean isActive
+        +String googleRefreshToken
+        +boolean isGoogleLinked
+        +Long authServiceId
+        +String avatarUrl
+
+        %% Operations (User & Auth Services)
+        +searchUsers(String query) List~UserDTO~
+        +getUserProfile(String username) UserDTO
+        +updateUserProfile(String username, Request req, File avatar) UserDTO
+        +login(LoginRequest req) AuthResponse
+        +register(RegisterRequest req) String
+        +forgotPassword(ForgotPasswordRequest req) String
+        +resetPassword(ResetPasswordRequest req) String
+        +changePassword(Long userId, ChangePasswordRequest req)
+        
+        %% Operations (Admin Service)
+        +getAllUsers() List~AdminUserDTO~
+        +createUser(AdminUserCreationRequest req, File avatar) AdminUserDTO
+        +updateUser(Long userId, AdminUserUpdateRequest req, File avatar) AdminUserDTO
+        +deleteUser(Long userId, Long adminId)
+    }
+
+    class Room {
+        %% Attributes
+        +Long id
+        +String name
+        +int capacity
+        +String location
+        +String buildingName
+        +Integer floor
+        +List~String~ fixedDevices
+        +Set~Role~ requiredRoles
+        +RoomStatus status
+        +boolean requiresApproval
+        +List~String~ images
+
+        %% Operations
+        +getAllRooms() List~RoomDTO~
+        +createRoom(RoomRequest req, List~File~ images) RoomDTO
+        +updateRoom(Long id, RoomRequest req, List~File~ images) RoomDTO
+        +deleteRoom(Long id)
+        +findAvailableRooms(DateTime start, DateTime end, int capacity) List~RoomDTO~
+    }
+
+    class Meeting {
+        %% Attributes
+        +Long id
+        +String title
+        +String description
+        +LocalDateTime startTime
+        +LocalDateTime endTime
+        +BookingStatus status
+        +boolean isCheckedIn
+        +String cancelReason
+        +LocalDateTime cancelledAt
+        +String checkinCode
+        +String googleEventId
+        +String seriesId
+        +Set~String~ guestEmails
+        
+        %% Operations
+        +createMeeting(MeetingCreationRequest req, Long organizerId) MeetingDTO
+        +getMeetingById(Long id, Long userId) MeetingDTO
+        +getMyMeetings(Long userId, Pageable page) Page~MeetingDTO~
+        +getAllMeetings(Pageable page) Page~MeetingDTO~
+        +updateMeeting(Long id, MeetingUpdateRequest req, Long userId) MeetingDTO
+        +cancelMeeting(Long id, MeetingCancelRequest req, Long userId)
+        +checkIn(CheckInRequest req, Long userId) String
+        +checkInByQrCode(String qrCode, Long userId)
+        +respondToInvitation(Long id, MeetingResponseRequest req, Long userId)
+        +respondByLink(String token, ParticipantStatus status) String
+        +cancelMeetingSeries(String seriesId, MeetingCancelRequest req, Long userId)
+        +updateMeetingSeries(String seriesId, MeetingCreationRequest req, Long userId) MeetingDTO
+        +getRoomSchedule(Long roomId, DateTime start, DateTime end) List~BookedSlotDTO~
+        +getDeviceSchedule(Long deviceId, DateTime start, DateTime end) List~BookedSlotDTO~
+        +processMeetingApproval(Long id, boolean approved, String reason, Long adminId)
+        +generateGoogleCalendarLink(Long id) String
+        +autoCancelGhostMeeting(String reason)
+    }
+
+    class Device {
+        %% Attributes
+        +Long id
+        +String name
+        +String description
+        +DeviceStatus status
+        +List~String~ images
+
+        %% Operations
+        +getAllDevices() List~DeviceDTO~
+        +createDevice(DeviceRequest req, List~File~ images) DeviceDTO
+        +updateDevice(Long id, DeviceRequest req, List~File~ images) DeviceDTO
+        +deleteDevice(Long id)
+        +findAvailableDevices(DateTime start, DateTime end) List~DeviceDTO~
+    }
+
+    class ContactGroup {
+        %% Attributes
+        +Long id
+        +String name
+
+        %% Operations
+        +getMyContactGroups(Long userId) List~ContactGroupDTO~
+        +createContactGroup(ContactGroupRequest req, Long userId) ContactGroupDTO
+        +updateContactGroup(Long groupId, ContactGroupRequest req, Long userId) ContactGroupDTO
+        +deleteContactGroup(Long groupId, Long userId)
+    }
+
+    class Notification {
+        %% Attributes
+        +Long id
+        +String message
+        +boolean isRead
+        +LocalDateTime createdAt
+
+        %% Operations
+        +getMyNotifications(Long userId, Pageable page) Page~NotificationDTO~
+        +getUnreadCount(Long userId) Map
+        +markAsRead(Long notifId, Long userId) NotificationDTO
+        +markAllAsRead(Long userId)
+        +createNotification(User user, String msg, Meeting meeting)
+    }
+
+    class MeetingParticipant {
+        +ParticipantStatus status
+        +String responseToken
+        +LocalDateTime checkedInAt
+    }
+
+    class MeetingAttachment {
+        +Long id
+        +String fileName
+        +String fileUrl
+        +String filePublicId
+    }
+
+    %% Enums
+    class Role {
+        <<enumeration>>
+        ROLE_USER
+        ROLE_ADMIN
+    }
+
+    class RoomStatus {
+        <<enumeration>>
+        AVAILABLE
+        MAINTENANCE
+    }
+
+    class BookingStatus {
+        <<enumeration>>
+        CONFIRMED
+        CANCELLED
+        PENDING
+    }
+
+    class ParticipantStatus {
+        <<enumeration>>
+        PENDING
+        ACCEPTED
+        DECLINED
+    }
+
+    class DeviceStatus {
+        <<enumeration>>
+        AVAILABLE
+        MAINTENANCE
+    }
+
+    %% =========================================================
+    %% RELATIONSHIPS
+    %% =========================================================
+
+    Meeting "0..*" --> "1" Room : takes place in
+    Meeting "0..*" --> "1" User : organizer/creator
+    Meeting "0..*" --> "0..*" Device : uses
+    
+    Meeting "1" *-- "0..*" MeetingParticipant : contains
+    MeetingParticipant --> "1" User : represents
+    
+    Meeting "1" *-- "0..*" MeetingAttachment : has
+    
+    Notification "0..*" --> "1" User : recipients
+    Notification "0..*" --> "0..1" Meeting : regarding
+
+    ContactGroup "0..*" --> "1" User : owner
+    ContactGroup "0..*" --> "0..*" User : members
+
+    User ..> Role
+    Room ..> Role
+    Room ..> RoomStatus
+    Meeting ..> BookingStatus
+    MeetingParticipant ..> ParticipantStatus
+    Device ..> DeviceStatus
