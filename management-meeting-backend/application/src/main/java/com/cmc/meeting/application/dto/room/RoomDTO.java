@@ -6,6 +6,7 @@ import com.cmc.meeting.domain.model.Role; // Bổ sung
 import com.cmc.meeting.domain.model.RoomStatus;
 
 import java.util.Set; // Bổ sung
+import com.cmc.meeting.application.dto.device.DeviceDTO;
 
 @Data
 public class RoomDTO {
@@ -15,7 +16,7 @@ public class RoomDTO {
     private String location;
     private String buildingName;
     private Integer floor;
-    private List<String> fixedDevices;
+    private List<DeviceDTO> devices;
     private Set<Role> requiredRoles;
     private RoomStatus status;
     private boolean requiresApproval;

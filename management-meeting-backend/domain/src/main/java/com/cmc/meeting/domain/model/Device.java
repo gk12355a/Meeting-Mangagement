@@ -9,4 +9,5 @@ public class Device {
     private String description;
     private DeviceStatus status = DeviceStatus.AVAILABLE;
     private java.util.List<String> images;
+    private Long roomId; // Link to Room
 }

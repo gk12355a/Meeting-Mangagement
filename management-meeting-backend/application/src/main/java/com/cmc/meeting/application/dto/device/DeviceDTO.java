@@ -11,4 +11,5 @@ public class DeviceDTO {
     private String description;
     private DeviceStatus status;
     private java.util.List<String> images;
+    private Long roomId; // ID của phòng chứa thiết bị
 }

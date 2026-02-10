@@ -25,7 +25,7 @@ public class RoomRequest {
     private Integer floor;
 
     @JsonFormat(with = JsonFormat.Feature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
-    private List<String> fixedDevices; // (BS-14.2)
+    private List<Long> deviceIds; // (BS-14.2) - Refactored to IDs
     private Set<Role> requiredRoles;
 
     private RoomStatus status;

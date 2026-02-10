@@ -21,6 +21,10 @@ public class DeviceEntity {
     @Column(nullable = false)
     private DeviceStatus status = DeviceStatus.AVAILABLE;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "room_id")
+    private RoomEntity room;
+
     @ElementCollection
     @CollectionTable(name = "device_images", joinColumns = @JoinColumn(name = "device_id"))
     @Column(name = "image_url")

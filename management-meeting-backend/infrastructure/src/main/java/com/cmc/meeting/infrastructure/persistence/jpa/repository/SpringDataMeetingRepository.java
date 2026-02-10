@@ -20,13 +20,13 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
         // (US-6) Lấy lịch họp của tôi (phân trang)
         @Query("SELECT DISTINCT m FROM MeetingEntity m " +
                         "LEFT JOIN m.participants p " +
-                        "WHERE m.organizer.id = :userId OR p.userId = :userId " +
+                        "WHERE m.organizer.id = :userId OR p.user.id = :userId " +
                         "ORDER BY m.startTime DESC")
         Page<MeetingEntity> findMyMeetings(@Param("userId") Long userId, Pageable pageable);
 
         // (US-5) Kiểm tra xung đột người tham gia
         @Query("SELECT m FROM MeetingEntity m JOIN m.participants p " +
-                        "WHERE p.userId IN :userIds " +
+                        "WHERE p.user.id IN :userIds " +
                         "AND m.status NOT IN ('CANCELLED', 'REJECTED') " +
                         "AND m.startTime < :endTime AND m.endTime > :startTime " +
                         "AND (:ignoreId IS NULL OR m.id != :ignoreId)")
@@ -53,7 +53,7 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
         // (US-6) Lấy lịch họp của tôi (bản cũ, không phân trang)
         @Query("SELECT DISTINCT m FROM MeetingEntity m " +
                         "LEFT JOIN m.participants p " +
-                        "WHERE m.organizer.id = :userId OR p.userId = :userId")
+                        "WHERE m.organizer.id = :userId OR p.user.id = :userId")
         List<MeetingEntity> findAllByUserId(@Param("userId") Long userId);
 
         // (US-22) Báo cáo sử dụng phòng
@@ -90,7 +90,7 @@ public interface SpringDataMeetingRepository extends JpaRepository<MeetingEntity
         @Query("SELECT m FROM MeetingEntity m JOIN m.participants p " +
                         "WHERE m.status = 'CONFIRMED' " +
                         "AND m.startTime < :to AND m.endTime > :from " +
-                        "AND p.userId IN :userIds") // Giả sử là p.userId
+                        "AND p.user.id IN :userIds") // Giả sử là p.userId
         List<MeetingEntity> findMeetingsForUsersInDateRange(
                         @Param("userIds") Set<Long> userIds,
                         @Param("from") LocalDateTime from,

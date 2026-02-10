@@ -47,13 +47,21 @@ public class DeviceRepositoryAdapter implements DeviceRepository {
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);
     }
+
     @Override
     public List<Device> findAllByStatus(DeviceStatus status) {
         // Gọi hàm JPA repo
         List<DeviceEntity> entities = jpaRepository.findAllByStatus(status);
-        
+
         // Map từ List<Entity> sang List<Domain Model>
         return entities.stream()
+                .map(entity -> modelMapper.map(entity, Device.class))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Device> findAllByRoomId(Long roomId) {
+        return jpaRepository.findAllByRoomId(roomId).stream()
                 .map(entity -> modelMapper.map(entity, Device.class))
                 .collect(Collectors.toList());
     }

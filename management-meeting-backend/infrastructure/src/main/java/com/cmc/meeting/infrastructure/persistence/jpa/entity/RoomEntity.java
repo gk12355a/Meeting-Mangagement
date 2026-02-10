@@ -2,7 +2,10 @@ package com.cmc.meeting.infrastructure.persistence.jpa.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import jakarta.persistence.*;
+import lombok.Data;
 import java.util.List;
+import java.util.ArrayList;
 
 import com.cmc.meeting.domain.model.RoomStatus;
 
@@ -29,11 +32,9 @@ public class RoomEntity {
     @Column(name = "floor")
     private Integer floor;
 
-    // Lưu danh sách thiết bị cố định (BS-14.2)
-    @ElementCollection
-    @CollectionTable(name = "room_devices", joinColumns = @JoinColumn(name = "room_id"))
-    @Column(name = "device_name")
-    private List<String> fixedDevices;
+    // Quan hệ 1-N với DeviceEntity
+    @OneToMany(mappedBy = "room", fetch = FetchType.LAZY)
+    private List<DeviceEntity> devices;
 
     // BỔ SUNG: (BS-11.1)
     @Enumerated(EnumType.STRING)
