@@ -59,4 +59,11 @@ public class RoomRepositoryAdapter implements RoomRepository {
                 .map(entity -> modelMapper.map(entity, Room.class)) // Dùng ModelMapper
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public List<Room> searchByName(String query) {
+        return jpaRepository.searchByName(query).stream()
+                .map(entity -> modelMapper.map(entity, Room.class))
+                .collect(Collectors.toList());
+    }
 }
