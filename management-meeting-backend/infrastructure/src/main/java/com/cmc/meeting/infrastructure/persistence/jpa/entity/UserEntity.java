@@ -2,11 +2,13 @@ package com.cmc.meeting.infrastructure.persistence.jpa.entity;
 
 import com.cmc.meeting.domain.model.Role; // Bổ sung
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import java.util.Set; // Bổ sung
 import java.util.HashSet; // Bổ sung
 
-@Data
+@Getter
+@Setter
 @Entity
 @Table(name = "users") // Đặt tên bảng là "users"
 public class UserEntity {

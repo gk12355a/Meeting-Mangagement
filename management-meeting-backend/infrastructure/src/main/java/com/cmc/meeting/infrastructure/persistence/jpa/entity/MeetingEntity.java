@@ -4,14 +4,16 @@ import com.cmc.meeting.domain.model.BookingStatus;
 import com.cmc.meeting.infrastructure.persistence.jpa.entity.MeetingParticipantEntity;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 import com.cmc.meeting.domain.model.Role;
 
-@Data
+@Getter
+@Setter
 @Entity
 @Table(name = "meetings")
 public class MeetingEntity {

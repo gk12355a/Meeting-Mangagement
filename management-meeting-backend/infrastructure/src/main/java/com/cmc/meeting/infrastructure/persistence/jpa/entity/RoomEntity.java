@@ -1,15 +1,15 @@
 package com.cmc.meeting.infrastructure.persistence.jpa.entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
-import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import java.util.List;
 import java.util.ArrayList;
 
 import com.cmc.meeting.domain.model.RoomStatus;
 
-@Data
+@Getter
+@Setter
 @Entity
 @Table(name = "rooms")
 public class RoomEntity {

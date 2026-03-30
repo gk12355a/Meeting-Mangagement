@@ -111,6 +111,7 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
 
                         MeetingParticipant p = new MeetingParticipant(user, partEntity.getStatus(),
                                 partEntity.getResponseToken());
+                        p.setId(partEntity.getId());
                         p.setCheckedInAt(partEntity.getCheckedInAt());
                         p.setMeeting(meeting);
                         return p;
@@ -132,6 +133,9 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
             Set<MeetingParticipantEntity> participantEntities = meeting.getParticipants().stream()
                     .map(participant -> {
                         MeetingParticipantEntity partEntity = new MeetingParticipantEntity();
+                        if (participant.getId() != null) {
+                            partEntity.setId(participant.getId());
+                        }
 
                         // Set User Entity (Giả định Hibernate sẽ xử lý reference nếu chỉ có ID, hoặc
                         // phải fetch)
