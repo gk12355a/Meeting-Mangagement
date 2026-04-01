@@ -63,7 +63,7 @@ public interface MeetingRepository {
     Optional<Meeting> findCurrentMeetingAtRoom(Long roomId, LocalDateTime checkTime);
     Optional<Meeting> findByCheckinCode(String checkinCode);
 
-    boolean existsConfirmedMeetingInTimeRange(Long roomId, LocalDateTime startTime, LocalDateTime endTime, Long meetingIdToIgnore);
+    List<Meeting> findConfirmedMeetingsInTimeRange(Long roomId, LocalDateTime startTime, LocalDateTime endTime, Long meetingIdToIgnore);
 
     List<Meeting> findPendingConflicts(Long roomId, LocalDateTime startTime, LocalDateTime endTime, Long excludedMeetingId);
 }

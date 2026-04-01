@@ -1,17 +1,19 @@
 package com.cmc.meeting.infrastructure.persistence.jpa.entity;
 
 import com.cmc.meeting.domain.model.BookingStatus;
-import com.cmc.meeting.infrastructure.persistence.jpa.embeddable.EmbeddableParticipant;
+import com.cmc.meeting.infrastructure.persistence.jpa.entity.MeetingParticipantEntity;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 import com.cmc.meeting.domain.model.Role;
 
-@Data
+@Getter
+@Setter
 @Entity
 @Table(name = "meetings")
 public class MeetingEntity {
@@ -49,9 +51,8 @@ public class MeetingEntity {
     @JoinColumn(name = "organizer_id", nullable = false)
     private UserEntity organizer;
 
-    @ElementCollection(fetch = FetchType.EAGER) // Lấy danh sách participant ngay
-    @CollectionTable(name = "meeting_participants", joinColumns = @JoinColumn(name = "meeting_id"))
-    private Set<EmbeddableParticipant> participants;
+    @OneToMany(mappedBy = "meeting", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private Set<MeetingParticipantEntity> participants = new HashSet<>();
 
     @Column(nullable = false, columnDefinition = "BIT(1) DEFAULT 0")
     private boolean isCheckedIn = false;

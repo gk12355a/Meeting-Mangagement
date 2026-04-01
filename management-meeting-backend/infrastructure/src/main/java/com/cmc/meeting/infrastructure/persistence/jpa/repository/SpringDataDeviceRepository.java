@@ -8,5 +8,7 @@ import java.util.List;
 public interface SpringDataDeviceRepository extends JpaRepository<DeviceEntity, Long> {
 
     // THÊM DÒNG NÀY (Spring Data JPA tự hiểu để query)
-    List<DeviceEntity> findAllByStatus(DeviceStatus status); 
+    List<DeviceEntity> findAllByStatus(DeviceStatus status);
+
+    List<DeviceEntity> findAllByRoomId(Long roomId);
 }

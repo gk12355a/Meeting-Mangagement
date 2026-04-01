@@ -10,4 +10,5 @@ public class NotificationDTO {
     private boolean isRead;
     private LocalDateTime createdAt;
     private Long meetingId; // Chỉ trả về ID cuộc họp
+    private String meetingStatus; // MỚI: Trả về trạng thái cuộc họp
 }

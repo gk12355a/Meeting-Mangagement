@@ -39,12 +39,18 @@ public class AdminUserController {
         return ResponseEntity.ok(adminUserService.getAllUsers());
     }
 
-    @PutMapping(value = "/{id}", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<AdminUserDTO> updateUser(
             @PathVariable Long id,
             @RequestPart("request") @Valid AdminUserUpdateRequest request,
             @RequestPart(value = "avatar", required = false) org.springframework.web.multipart.MultipartFile avatar) {
         return ResponseEntity.ok(adminUserService.updateUser(id, request, avatar));
+    }
+
+    @PutMapping(value = "/{id}", consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<AdminUserDTO> updateUserJson(
+            @PathVariable Long id,
+            @RequestBody @Valid AdminUserUpdateRequest request) {
+        return ResponseEntity.ok(adminUserService.updateUser(id, request, null));
     }
 
     @DeleteMapping("/{id}")

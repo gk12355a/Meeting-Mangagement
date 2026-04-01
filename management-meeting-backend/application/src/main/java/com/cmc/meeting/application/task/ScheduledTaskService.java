@@ -27,7 +27,7 @@ public class ScheduledTaskService {
     // 1. Thêm Port xử lý Email
     private final EmailNotificationPort emailNotificationPort;
 
-    private static final int DEFAULT_GRACE_PERIOD_MINUTES = 15;
+    private static final int DEFAULT_GRACE_PERIOD_MINUTES = 5;
 
     public ScheduledTaskService(MeetingRepository meetingRepository,
                                 AppConfigService appConfigService,
@@ -39,8 +39,8 @@ public class ScheduledTaskService {
         this.emailNotificationPort = emailNotificationPort;
     }
 
-    // --- TÁC VỤ 1: TỰ ĐỘNG HỦY CUỘC HỌP MA (Chạy mỗi 5 phút) ---
-    @Scheduled(cron = "0 */5 * * * *")
+    // --- TÁC VỤ 1: TỰ ĐỘNG HỦY CUỘC HỌP MA (Chạy mỗi 1 phút) ---
+    @Scheduled(cron = "0 * * * * *")
     @Transactional
     public void autoReleaseGhostMeetings() {
         log.info("SCHEDULER: Đang chạy tác vụ tự động giải phóng phòng...");

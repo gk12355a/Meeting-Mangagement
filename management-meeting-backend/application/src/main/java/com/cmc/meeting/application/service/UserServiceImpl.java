@@ -37,6 +37,25 @@ public class UserServiceImpl implements UserService {
         // Gọi hàm tìm kiếm từ Repository
         List<User> users = userRepository.searchByNameOrUsername(query);
 
+        // Fallback 1: Thử loại bỏ các ký tự lặp lại (VD: "kiênnnn" -> "kiên")
+        if (users.isEmpty() && query.length() > 1) {
+            String normalizedQuery = query.replaceAll("(.)\\1+", "$1");
+            if (!normalizedQuery.equals(query)) {
+                users = userRepository.searchByNameOrUsername(normalizedQuery);
+            }
+        }
+
+        // Fallback 2: Thử cắt dần các ký tự ở cuối (VD: "kiennt" -> "kienn" -> "kien")
+        if (users.isEmpty() && query.length() > 3) {
+            for (int i = query.length() - 1; i >= 3; i--) {
+                String subQuery = query.substring(0, i);
+                users = userRepository.searchByNameOrUsername(subQuery);
+                if (!users.isEmpty()) {
+                    break;
+                }
+            }
+        }
+
         // Ánh xạ sang DTO
         return users.stream()
                 .map(this::convertToDTO) // Sử dụng hàm convert chung để đảm bảo map đủ roles

@@ -5,10 +5,11 @@ import com.cmc.meeting.domain.model.Meeting;
 import com.cmc.meeting.domain.model.MeetingParticipant;
 import com.cmc.meeting.domain.model.User;
 import com.cmc.meeting.domain.port.repository.MeetingRepository;
-import com.cmc.meeting.domain.port.repository.UserRepository;
+
 import com.cmc.meeting.infrastructure.persistence.jpa.entity.DeviceEntity;
 import com.cmc.meeting.infrastructure.persistence.jpa.entity.MeetingEntity;
-import com.cmc.meeting.infrastructure.persistence.jpa.embeddable.EmbeddableParticipant;
+import com.cmc.meeting.infrastructure.persistence.jpa.entity.MeetingParticipantEntity;
+import com.cmc.meeting.infrastructure.persistence.jpa.entity.UserEntity;
 import com.cmc.meeting.infrastructure.persistence.jpa.repository.*;
 import jakarta.annotation.PostConstruct;
 
@@ -29,14 +30,11 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
 
     private final SpringDataMeetingRepository jpaRepository;
     private final ModelMapper modelMapper;
-    private final UserRepository userRepository;
 
     public MeetingRepositoryAdapter(SpringDataMeetingRepository jpaRepository,
-                                    ModelMapper modelMapper,
-                                    UserRepository userRepository) {
+            ModelMapper modelMapper) {
         this.jpaRepository = jpaRepository;
         this.modelMapper = modelMapper;
-        this.userRepository = userRepository;
     }
 
     @Override
@@ -61,16 +59,22 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
     }
 
     @Override
-    public boolean existsConfirmedMeetingInTimeRange(Long roomId, LocalDateTime startTime, LocalDateTime endTime, Long meetingIdToIgnore) {
+    public List<Meeting> findConfirmedMeetingsInTimeRange(Long roomId, LocalDateTime startTime, LocalDateTime endTime,
+            Long meetingIdToIgnore) {
         // Gọi hàm Query đã viết trong SpringDataMeetingRepository
-        return jpaRepository.existsConfirmedMeetingInTimeRange(roomId, startTime, endTime, meetingIdToIgnore);
+        List<MeetingEntity> entities = jpaRepository.findConfirmedMeetingsInTimeRange(roomId, startTime, endTime, meetingIdToIgnore);
+        return entities.stream()
+                .map(this::toDomain)
+                .collect(Collectors.toList());
     }
 
     @Override
-    public List<Meeting> findPendingConflicts(Long roomId, LocalDateTime startTime, LocalDateTime endTime, Long excludedMeetingId) {
+    public List<Meeting> findPendingConflicts(Long roomId, LocalDateTime startTime, LocalDateTime endTime,
+            Long excludedMeetingId) {
         // Gọi hàm Query lấy danh sách Entity
-        List<MeetingEntity> entities = jpaRepository.findPendingConflicts(roomId, startTime, endTime, excludedMeetingId);
-        
+        List<MeetingEntity> entities = jpaRepository.findPendingConflicts(roomId, startTime, endTime,
+                excludedMeetingId);
+
         // Map từ Entity sang Domain
         return entities.stream()
                 .map(this::toDomain)
@@ -94,46 +98,27 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
     // --- CÁC HÀM HELPER (ĐÃ SỬA LỖI MAPPING) ---
 
     private Meeting toDomain(MeetingEntity entity) {
-        if (entity == null) return null;
+        if (entity == null)
+            return null;
 
         // 1. Map các trường đơn giản
         Meeting meeting = modelMapper.map(entity, Meeting.class);
 
-        // 2. Map 'participants' (ĐÃ TỐI ƯU QUERY & SỬA LỖI MAPPING)
+        // 2. Map 'participants' - GIỜ ĐÂY DỄ DÀNG HƠN VÌ ĐÃ LÀ ENTITY
         if (entity.getParticipants() != null && !entity.getParticipants().isEmpty()) {
-            
-            // B1: Lấy danh sách tất cả User ID để query 1 lần
-            Set<Long> userIds = entity.getParticipants().stream()
-                    .map(EmbeddableParticipant::getUserId)
-                    .collect(Collectors.toSet());
 
-            // B2: Query 1 lần (giả sử UserRepository trả về List<User>)
-            // Nếu findAllById trả về Iterable, cần ép kiểu hoặc dùng Stream
-            List<User> users = userRepository.findAllById(userIds); // Cần đảm bảo UserRepository có hàm này
-
-            // B3: Tạo Map để tra cứu nhanh
-            Map<Long, User> userMap = users.stream()
-                    .collect(Collectors.toMap(User::getId, Function.identity()));
-
-            // B4: Map sang Domain Object
             Set<MeetingParticipant> participants = entity.getParticipants().stream()
-                    .map(embeddable -> {
-                        User user = userMap.get(embeddable.getUserId());
-                        if (user == null) return null; // Skip nếu user không tồn tại
-                        
-                        MeetingParticipant p = new MeetingParticipant(user, embeddable.getStatus(), embeddable.getResponseToken());
-                        
-                        // === SỬA LỖI 1: MAP THỜI GIAN CHECK-IN TỪ DB LÊN ===
-                        if (embeddable.getCheckedInAt() != null) {
-                            p.setCheckedInAt(embeddable.getCheckedInAt());
-                        }
-                        // ===================================================
+                    .map(partEntity -> {
+                        // User đã có sẵn trong Entity
+                        User user = modelMapper.map(partEntity.getUser(), User.class);
 
-                        // Liên kết ngược (nếu cần thiết cho logic save sau này)
+                        MeetingParticipant p = new MeetingParticipant(user, partEntity.getStatus(),
+                                partEntity.getResponseToken());
+                        p.setId(partEntity.getId());
+                        p.setCheckedInAt(partEntity.getCheckedInAt());
                         p.setMeeting(meeting);
                         return p;
                     })
-                    .filter(Objects::nonNull)
                     .collect(Collectors.toSet());
 
             meeting.setParticipants(participants);
@@ -143,27 +128,34 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
     }
 
     private MeetingEntity toEntity(Meeting meeting) {
-        if (meeting == null) return null;
+        if (meeting == null)
+            return null;
         MeetingEntity entity = modelMapper.map(meeting, MeetingEntity.class);
 
         if (meeting.getParticipants() != null) {
-            Set<EmbeddableParticipant> embeddableParticipants = meeting.getParticipants().stream()
+            Set<MeetingParticipantEntity> participantEntities = meeting.getParticipants().stream()
                     .map(participant -> {
-                        EmbeddableParticipant embeddable = new EmbeddableParticipant();
-                        embeddable.setUserId(participant.getUser().getId());
-                        embeddable.setStatus(participant.getStatus());
-                        embeddable.setResponseToken(participant.getResponseToken());
-                        
-                        // === SỬA LỖI 2: MAP THỜI GIAN CHECK-IN XUỐNG DB ===
-                        if (participant.getCheckedInAt() != null) {
-                            embeddable.setCheckedInAt(participant.getCheckedInAt());
+                        MeetingParticipantEntity partEntity = new MeetingParticipantEntity();
+                        if (participant.getId() != null) {
+                            partEntity.setId(participant.getId());
                         }
-                        // ===================================================
-                        
-                        return embeddable;
+
+                        // Set User Entity (Giả định Hibernate sẽ xử lý reference nếu chỉ có ID, hoặc
+                        // phải fetch)
+                        // Tốt nhất là fetch UserEntity từ DB nếu đây là update, hoặc tạo reference
+                        UserEntity userEntity = new UserEntity();
+                        userEntity.setId(participant.getUser().getId());
+                        partEntity.setUser(userEntity);
+
+                        partEntity.setStatus(participant.getStatus());
+                        partEntity.setResponseToken(participant.getResponseToken());
+                        partEntity.setCheckedInAt(participant.getCheckedInAt());
+                        partEntity.setMeeting(entity); // Liên kết 2 chiều
+
+                        return partEntity;
                     })
                     .collect(Collectors.toSet());
-            entity.setParticipants(embeddableParticipants);
+            entity.setParticipants(participantEntities);
         }
         return entity;
     }
@@ -208,7 +200,7 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
     public void configureMapper() {
         TypeMap<MeetingEntity, Meeting> entityToDomainMap = modelMapper.typeMap(MeetingEntity.class, Meeting.class);
         // Skip để map thủ công trong toDomain()
-        entityToDomainMap.addMappings(mapper -> mapper.skip(Meeting::setParticipants)); 
+        entityToDomainMap.addMappings(mapper -> mapper.skip(Meeting::setParticipants));
 
         TypeMap<Meeting, MeetingEntity> domainToEntityMap = modelMapper.typeMap(Meeting.class, MeetingEntity.class);
         domainToEntityMap.addMappings(mapper -> mapper.skip(MeetingEntity::setParticipants));
@@ -243,8 +235,10 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
     }
 
     @Override
-    public List<Meeting> findConflictingMeetingsForUsers(Set<Long> userIds, LocalDateTime startTime, LocalDateTime endTime, Long meetingIdToIgnore) {
-        List<MeetingEntity> entities = jpaRepository.findConflictingMeetingsForUsers(userIds, startTime, endTime, meetingIdToIgnore);
+    public List<Meeting> findConflictingMeetingsForUsers(Set<Long> userIds, LocalDateTime startTime,
+            LocalDateTime endTime, Long meetingIdToIgnore) {
+        List<MeetingEntity> entities = jpaRepository.findConflictingMeetingsForUsers(userIds, startTime, endTime,
+                meetingIdToIgnore);
         return entities.stream()
                 .map(this::toDomain)
                 .collect(Collectors.toList());
@@ -262,8 +256,10 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
     }
 
     @Override
-    public boolean isDeviceBusy(Set<Long> deviceIds, LocalDateTime startTime, LocalDateTime endTime, Long meetingIdToIgnore) {
-        if (deviceIds == null || deviceIds.isEmpty()) return false;
+    public boolean isDeviceBusy(Set<Long> deviceIds, LocalDateTime startTime, LocalDateTime endTime,
+            Long meetingIdToIgnore) {
+        if (deviceIds == null || deviceIds.isEmpty())
+            return false;
         return jpaRepository.existsConflictingDevice(deviceIds, startTime, endTime, meetingIdToIgnore);
     }
 
@@ -284,7 +280,8 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
 
     @Override
     @Transactional(readOnly = true)
-    public List<Meeting> findMeetingsByDeviceAndTimeRange(Long deviceId, LocalDateTime startTime, LocalDateTime endTime) {
+    public List<Meeting> findMeetingsByDeviceAndTimeRange(Long deviceId, LocalDateTime startTime,
+            LocalDateTime endTime) {
         return jpaRepository.findMeetingsByDeviceAndTimeRange(deviceId, startTime, endTime).stream()
                 .map(this::toDomain)
                 .collect(Collectors.toList());
@@ -294,11 +291,12 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
     public List<Meeting> findByStartTimeBetween(LocalDateTime start, LocalDateTime end) {
         // Gọi hàm findAllByStartTimeBetween vừa thêm ở Bước 1
         List<MeetingEntity> entities = jpaRepository.findAllByStartTimeBetween(start, end);
-        
+
         return entities.stream()
                 .map(this::toDomain) // Sử dụng hàm helper toDomain của bạn
                 .collect(Collectors.toList());
     }
+
     @Override
     public Optional<Meeting> findCurrentMeetingAtRoom(Long roomId, LocalDateTime checkTime) {
         // Gọi hàm findActiveMeetingInRoom vừa thêm ở Bước 1

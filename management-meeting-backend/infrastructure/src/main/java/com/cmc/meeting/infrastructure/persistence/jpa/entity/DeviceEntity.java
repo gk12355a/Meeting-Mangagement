@@ -3,9 +3,11 @@ package com.cmc.meeting.infrastructure.persistence.jpa.entity;
 import com.cmc.meeting.domain.model.DeviceStatus;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
+@Getter
+@Setter
 @Entity
 @Table(name = "devices")
 public class DeviceEntity {
@@ -16,10 +18,15 @@ public class DeviceEntity {
     @Column(nullable = false, unique = true)
     private String name;
 
+    @Column(columnDefinition = "TEXT")
     private String description;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private DeviceStatus status = DeviceStatus.AVAILABLE;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "room_id")
+    private RoomEntity room;
 
     @ElementCollection
     @CollectionTable(name = "device_images", joinColumns = @JoinColumn(name = "device_id"))

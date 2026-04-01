@@ -11,8 +11,12 @@ public interface RoomRepository {
     List<Room> findAll();
 
     Optional<Room> findById(Long id);
+
     Room save(Room room);
 
     void deleteById(Long id);
+
     List<Room> findAvailableRooms(LocalDateTime startTime, LocalDateTime endTime, int capacity);
+
+    List<Room> searchByName(String query);
 }

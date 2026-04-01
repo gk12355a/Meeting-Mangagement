@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 // @AllArgsConstructor // Bỏ đi
 public class MeetingParticipant {
+    private Long id;
     private User user;
     private ParticipantStatus status;
     

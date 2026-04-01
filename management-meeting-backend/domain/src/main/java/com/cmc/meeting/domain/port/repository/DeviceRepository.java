@@ -8,8 +8,14 @@ import java.util.Optional;
 
 public interface DeviceRepository {
     List<Device> findAll();
+
     Optional<Device> findById(Long id);
+
     Device save(Device device);
+
     void deleteById(Long id);
+
     List<Device> findAllByStatus(DeviceStatus status);
+
+    List<Device> findAllByRoomId(Long roomId);
 }
