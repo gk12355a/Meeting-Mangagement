@@ -59,10 +59,13 @@ public class MeetingRepositoryAdapter implements MeetingRepository {
     }
 
     @Override
-    public boolean existsConfirmedMeetingInTimeRange(Long roomId, LocalDateTime startTime, LocalDateTime endTime,
+    public List<Meeting> findConfirmedMeetingsInTimeRange(Long roomId, LocalDateTime startTime, LocalDateTime endTime,
             Long meetingIdToIgnore) {
         // Gọi hàm Query đã viết trong SpringDataMeetingRepository
-        return jpaRepository.existsConfirmedMeetingInTimeRange(roomId, startTime, endTime, meetingIdToIgnore);
+        List<MeetingEntity> entities = jpaRepository.findConfirmedMeetingsInTimeRange(roomId, startTime, endTime, meetingIdToIgnore);
+        return entities.stream()
+                .map(this::toDomain)
+                .collect(Collectors.toList());
     }
 
     @Override

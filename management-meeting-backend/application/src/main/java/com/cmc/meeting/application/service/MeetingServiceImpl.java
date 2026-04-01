@@ -485,11 +485,15 @@ public class MeetingServiceImpl implements MeetingService {
 
         if (isApproved) {
             // 1. Kiểm tra lại lần cuối xem có ai nhanh tay CONFIRMED trước đó không (Double-check)
-            boolean hasConflict = meetingRepository.existsConfirmedMeetingInTimeRange(
+            List<Meeting> confirmedBookings = meetingRepository.findConfirmedMeetingsInTimeRange(
                     meeting.getRoom().getId(), meeting.getStartTime(), meeting.getEndTime(), meeting.getId());
             
-            if (hasConflict) {
-                throw new MeetingConflictException("Đã có một cuộc họp khác được duyệt (CONFIRMED) trong khung giờ này rồi!");
+            if (!confirmedBookings.isEmpty()) {
+                Meeting conflict = confirmedBookings.get(0);
+                java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("HH:mm");
+                String startStr = conflict.getStartTime().format(formatter);
+                String endStr = conflict.getEndTime().format(formatter);
+                throw new MeetingConflictException(String.format("Đã có một cuộc họp khác được duyệt (CONFIRMED) từ %s đến %s trong khung giờ này rồi!", startStr, endStr));
             }
 
             // 2. Chốt lịch này (Winner)
@@ -602,13 +606,17 @@ public class MeetingServiceImpl implements MeetingService {
 
         // 3. Kiểm tra Xung đột phòng (Logic Mới: Soft Lock)
         // Chỉ chặn nếu đã có lịch CONFIRMED. Nếu chỉ có lịch PENDING, vẫn cho đặt tiếp.
-        boolean hasConfirmedBooking = meetingRepository.existsConfirmedMeetingInTimeRange(
+        List<Meeting> confirmedBookings = meetingRepository.findConfirmedMeetingsInTimeRange(
                 room.getId(), startTime, endTime, meetingIdToIgnore);
 
-        if (hasConfirmedBooking) {
+        if (!confirmedBookings.isEmpty()) {
+            Meeting conflict = confirmedBookings.get(0);
+            java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("HH:mm");
+            String startStr = conflict.getStartTime().format(formatter);
+            String endStr = conflict.getEndTime().format(formatter);
             throw new MeetingConflictException(String.format(
-                "Phòng '%s' đã có lịch CHÍNH THỨC (CONFIRMED) vào khung giờ này. Bạn không thể đặt chồng lên.", 
-                room.getName()));
+                "Phòng '%s' đã có lịch CHÍNH THỨC (CONFIRMED) bị trùng từ %s đến %s. Bạn không thể đặt chồng lên.", 
+                room.getName(), startStr, endStr));
         }
 
         // 4. Kiểm tra Xung đột người tham gia

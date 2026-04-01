@@ -98,6 +98,9 @@ public class NotificationServiceImpl implements NotificationService {
         // Lấy đối tượng Meeting từ Notification và lấy ID của nó
         if (notification.getMeeting() != null) {
             dto.setMeetingId(notification.getMeeting().getId());
+            if (notification.getMeeting().getStatus() != null) {
+                dto.setMeetingStatus(notification.getMeeting().getStatus().name());
+            }
         }
         // (Nếu notification.getMeeting() là null, meetingId của DTO sẽ tự động là null)
         

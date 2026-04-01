@@ -18,6 +18,7 @@ public class DeviceEntity {
     @Column(nullable = false, unique = true)
     private String name;
 
+    @Column(columnDefinition = "TEXT")
     private String description;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
