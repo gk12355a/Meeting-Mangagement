@@ -28,8 +28,8 @@ spec:
           command: ["/bin/sh", "-c"]
           args:
             - |
-              touch .env && 
-              java -javaagent:/app/opentelemetry-javaagent.jar -jar app.jar
+              touch /app/.env && 
+              java -javaagent:/app/opentelemetry-javaagent.jar $(JAVA_OPTS) -jar /app/app.jar
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
