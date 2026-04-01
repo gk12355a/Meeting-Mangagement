@@ -25,6 +25,11 @@ spec:
       containers:
         - name: backend
           image: gk123a/meeting-management-backend:v2.0.0-dev
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              touch .env && 
+              java -javaagent:/app/opentelemetry-javaagent.jar -jar app.jar
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
